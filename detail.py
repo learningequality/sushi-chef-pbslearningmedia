@@ -1,9 +1,19 @@
 import login
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
+import os
+import scraperwiki
 session = login.session
 
+try:
+    os.mkdir("zipcache")
+except FileExistsError:
+    pass
+
 sample_url="https://ca.pbslearningmedia.org/resource/vtl07.la.rv.text.cats/cats/"
+
+def filename_from_url(url):
+    return urlparse(url).path.strip("/").replace("/", "__")    
 
 def get_video_page(url, get_video=True):
     # works for audio, individual images, 
@@ -18,7 +28,26 @@ def get_video_page(url, get_video=True):
     response.raise_for_status()
     soup = BeautifulSoup(response.content, "html5lib")
     # TODO -- turn this into something useful.
-    print (soup.find("div", {'class': 'resource-content'}))
+    
+    data = {}
+    data['link'] = url
+    content = soup.find("div", {'class': 'resource-content'})
+    data['full_description'] = '\n'.join(tag.text for tag in soup.findAll("p"))
+    
+    support = soup.findAll("div", {"class": "accordion-menu"}) 
+    for accordion in support:  # Education is empty in source... TODO: remove it!
+        print(support)
+        accordion_title = accordion.find("h2").text.strip()
+        print(accordion_title)
+        subnodes = accordion.findAll("div", {"class": "collapsed"})
+        
+        for subnode in subnodes:
+            subnode_title = subnode.find("h2").text.strip()
+            print("++ ", subnode_title)
+            subnode_body = "\n".join(tag.text.strip() for tag in subnode.findAll("p")).strip()
+            print(repr(subnode_body))
+    
+    
     
     if get_video:
         print ("Downloading zip...")
@@ -27,14 +56,19 @@ def get_video_page(url, get_video=True):
     
         # Note: redirection URL valid only for an hour or so.
         zip_response = session.post(target, data={"agree": "on"})
-        with open("sample.zip", "wb") as f:
-            f.write(zip_response.content)
+        filename = "zipcache/"+filename_from_url(url)+".zip"
+        if not os.path.exists(filename):
+            with open(filename, "wb") as f:
+                f.write(zip_response.content)
             
         print ("{} bytes written".format(len(zip_response.content)))
 
     
 
 
-login.login()
+#login.login()
 #get_video_page(sample_url, get_video=False)
-get_video_page("https://ca.pbslearningmedia.org/resource/watsol.sci.ess.water.bfdq/bernheim-forest-discussion-questions/")
+x = scraperwiki.sqlite.select("* from 'index' order by 'modify' limit 1")
+print(x)
+exit()
+get_video_page("https://ca.pbslearningmedia.org/resource/754f0abf-0b58-4721-874b-44433c1a56d3/cat-and-rat", False)
