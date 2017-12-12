@@ -55,14 +55,17 @@ def get_video_page(url, get_video=True):
         target = urljoin(url, form.attrs['action'])
     
         # Note: redirection URL valid only for an hour or so.
-        zip_response = session.post(target, data={"agree": "on"})
+        zip_response = session.post(target, data={"agree": "on"}, stream=True)
         filename = "zipcache/"+filename_from_url(url)+".zip"
         if not os.path.exists(filename):
             print ("Downloading zip...")
             with open(filename, "wb") as f:
-                f.write(zip_response.content)
+                # https://www.reddit.com/r/learnpython/comments/27ba7t/requests_library_doesnt_download_directly_to_disk/
+                for chunk in zip_response.iter_content( chunk_size = 1024 ):
+                    if chunk: # filter out keep-alive new chunks
+                         f.write(chunk)
             
-            print ("{} bytes written".format(len(zip_response.content)))
+            print ("{} bytes written".format(zip_response.headers.get("content-length")))
 
     
 
@@ -79,9 +82,9 @@ def download_videos(filename):
         if item['category'] in ("Image", "Video"):
             get_video_page(item['link'])
     
-#download_videos('share.json')
+download_videos('share.json')
 
 
-get_video_page("https://ca.pbslearningmedia.org/resource/4192684a-ae65-4c50-9f09-3925aabcfc88/vietnam-west-virginians-remember/#.WjARZ9-YHCI")
+#get_video_page("https://ca.pbslearningmedia.org/resource/4192684a-ae65-4c50-9f09-3925aabcfc88/vietnam-west-virginians-remember/#.WjARZ9-YHCI")
 
 # get_video_page("https://ca.pbslearningmedia.org/resource/754f0abf-0b58-4721-874b-44433c1a56d3/cat-and-rat", False)
