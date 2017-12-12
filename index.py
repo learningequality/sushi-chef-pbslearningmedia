@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from collections import OrderedDict
 from urllib.parse import urljoin
 import requests_cache
-import scraperwiki
+import json
 
 requests_cache.install_cache()
 
@@ -22,12 +22,9 @@ def full_url(link):
         return ""
     return urljoin(BASE_URL, link)
 
-def search_index(params=None, flags=None):
+def search_index(params=None):
     # params: search parameters to add
-    # flags: flags to set if found: key/value pairs.
     
-    if flags is None:
-        flags = {}
     if params is None:
         params = {"q": "*"}
     elif "q" not in params.keys():
@@ -56,13 +53,13 @@ def search_index(params=None, flags=None):
             record['thumbnail'] = full_url(img.find("img").attrs.get("src"))
             record['link'] = full_url(img.find("a").attrs.get("href"))
             record['runtime'] = get_text(item.find("span", {'class': 'search-info-duration'}))
-            for flag in flags:
-                record[flag] = flags[flag]
-            records.append(record)
-        for record in records:
-            print (record.get('is_a_kitten'))
-            
-        scraperwiki.sqlite.save(table_name="index", data=records, unique_keys=['link'])
+            yield record
+
+def save_index(q, file):
+    with open(file, "w") as f:
+        for i, record in enumerate(search_index(q)):
+            if i>0: f.write("\n")
+            f.write(json.dumps(record))
 
 def index_collection(url):
     response = requests.get(url)
@@ -77,10 +74,9 @@ def index_collection(url):
 #exit()
         
 if __name__ == "__main__":
-    #search_index()
-    #search_index({"selected_facets":"permitted_use_exact:Stream, Download, Share, and Modify"}, {"modify": True})
-    search_index({"q": "kitten"}, {"is_a_kitten": True})
-    #search_index({"selected_facets":"permitted_use_exact:Stream, Download and Share"}, {"share": True})
-    #search_index({"selected_facets":"permitted_use_exact:Stream and Download"}, {"download": True})
-    #search_index({"selected_facets":"permitted_use_exact:Stream Only"}, {"stream": True}) 
+    #save_index({"selected_facets":"permitted_use_exact:Stream, Download, Share, and Modify"}, "modify.json")
+    #save_index({"q": "kitten"}, "kitten.json")
+    save_index({"selected_facets":"permitted_use_exact:Stream, Download and Share"}, "share.json")
+    save_index({"selected_facets":"permitted_use_exact:Stream and Download"}, "download.json")
+    #search_index({"selected_facets":"permitted_use_exact:Stream Only"}, "stream.json") 
         

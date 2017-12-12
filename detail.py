@@ -2,7 +2,7 @@ import login
 from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 import os
-import scraperwiki
+import json
 session = login.session
 
 try:
@@ -68,7 +68,17 @@ def get_video_page(url, get_video=True):
 
 #login.login()
 #get_video_page(sample_url, get_video=False)
-x = scraperwiki.sqlite.select("* from 'index' order by 'modify' limit 1")
-print(x)
-exit()
+
+def download_videos(filename):
+    with open(filename) as f:
+        database = [json.loads(line) for line in f.readlines()]
+        
+    
+    for item in database:
+        if item['category'] in ("Image", "Video"):
+            get_video_page(item['link'])
+    
+download_videos('kitten')
+
+
 get_video_page("https://ca.pbslearningmedia.org/resource/754f0abf-0b58-4721-874b-44433c1a56d3/cat-and-rat", False)
