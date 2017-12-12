@@ -59,11 +59,19 @@ def get_video_page(url, get_video=True):
         filename = "zipcache/"+filename_from_url(url)+".zip"
         if not os.path.exists(filename):
             print ("Downloading zip...")
-            with open(filename, "wb") as f:
-                # https://www.reddit.com/r/learnpython/comments/27ba7t/requests_library_doesnt_download_directly_to_disk/
-                for chunk in zip_response.iter_content( chunk_size = 1024 ):
-                    if chunk: # filter out keep-alive new chunks
-                         f.write(chunk)
+            try:
+                with open(filename, "wb") as f:
+                    # https://www.reddit.com/r/learnpython/comments/27ba7t/requests_library_doesnt_download_directly_to_disk/
+                    for chunk in zip_response.iter_content( chunk_size = 1024 ):
+                        if chunk: # filter out keep-alive new chunks
+                            f.write(chunk)
+            except:  # Explicitly, we want to catch CTRL-C here.
+                print("Catching...")
+                try:
+                    os.remove(filename)
+                except:
+                    pass
+                raise
             
             print ("{} bytes written".format(zip_response.headers.get("content-length")))
 
@@ -79,11 +87,12 @@ def download_videos(filename):
         
     
     for item in database:
-        if item['category'] in ("Image", "Video"):
+        if item['category'] in ("Document", "Audio", "Image", "Video"):
             get_video_page(item['link'])
     
 download_videos('share.json')
-
+download_videos('modify.json')
+download_videos('download.json')
 
 #get_video_page("https://ca.pbslearningmedia.org/resource/4192684a-ae65-4c50-9f09-3925aabcfc88/vietnam-west-virginians-remember/#.WjARZ9-YHCI")
 
