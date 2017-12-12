@@ -1,4 +1,5 @@
 import login
+
 from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 import os
@@ -50,7 +51,6 @@ def get_video_page(url, get_video=True):
     
     
     if get_video:
-        print ("Downloading zip...")
         form = soup.find("form", {"id": "download_form"})
         target = urljoin(url, form.attrs['action'])
     
@@ -58,10 +58,11 @@ def get_video_page(url, get_video=True):
         zip_response = session.post(target, data={"agree": "on"})
         filename = "zipcache/"+filename_from_url(url)+".zip"
         if not os.path.exists(filename):
+            print ("Downloading zip...")
             with open(filename, "wb") as f:
                 f.write(zip_response.content)
             
-        print ("{} bytes written".format(len(zip_response.content)))
+            print ("{} bytes written".format(len(zip_response.content)))
 
     
 
@@ -78,7 +79,9 @@ def download_videos(filename):
         if item['category'] in ("Image", "Video"):
             get_video_page(item['link'])
     
-download_videos('kitten')
+#download_videos('share.json')
 
 
-get_video_page("https://ca.pbslearningmedia.org/resource/754f0abf-0b58-4721-874b-44433c1a56d3/cat-and-rat", False)
+get_video_page("https://ca.pbslearningmedia.org/resource/4192684a-ae65-4c50-9f09-3925aabcfc88/vietnam-west-virginians-remember/#.WjARZ9-YHCI")
+
+# get_video_page("https://ca.pbslearningmedia.org/resource/754f0abf-0b58-4721-874b-44433c1a56d3/cat-and-rat", False)
