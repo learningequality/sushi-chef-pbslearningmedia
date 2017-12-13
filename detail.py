@@ -97,3 +97,5 @@ download_videos('download.json')
 #get_video_page("https://ca.pbslearningmedia.org/resource/4192684a-ae65-4c50-9f09-3925aabcfc88/vietnam-west-virginians-remember/#.WjARZ9-YHCI")
 
 # get_video_page("https://ca.pbslearningmedia.org/resource/754f0abf-0b58-4721-874b-44433c1a56d3/cat-and-rat", False)
+
+#extensions = {'notebook', 'swf', 'png', 'jpg', 'dfxp', 'm3u8', 'm4v', 'docx', 'pdf', 'dxfp', 'doc', 'gif', '3gp', 'htm', 'flv', 'html', 'vtt', 'mov', 'epub', 'pptx', 'mp4', 'mp3', 'f4v', 'txt'}
