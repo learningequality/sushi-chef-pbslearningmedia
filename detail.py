@@ -130,11 +130,11 @@ def get_individual_page(item):
             raise
             
             print ("{} bytes written".format(zip_response.headers.get("content-length")))
-            with open(filename, "rb") as f:
-                if f.read(2) != b"PK":
-                    raise NotAZipFile(filename)
+        with open(filename, "rb") as f:
+            if f.read(2) != b"PK":
+                raise NotAZipFile(filename)
     else:
-        print ("... is cached")
+        print ("... is cached as {}".format(filename))
             
     if item['category'] == "Video":
         return handle_video_zip(filename), data
@@ -152,9 +152,13 @@ def download_videos(filename):
     for item in database:
         print (item)
         if item['category'] in ["Video"]: # ("Document", "Audio", "Image", "Video"):
-            nodes, data = get_individual_page(item)
+            print(i)
+            i = i + 1
+            try:
+                nodes, data = get_individual_page(item)
+            except NotAZipFile:
+                continue
             # print (nodes, data)
-            #i=i+1
             #if i == 4:
             #    break
     

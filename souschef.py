@@ -59,7 +59,10 @@ def download_videos(jsonfile):
         
     for item in database:
         if item['category'] in ["Video"]: # ("Document", "Audio", "Image", "Video"):
-            yield detail.get_individual_page(item)
+            try:
+                yield detail.get_individual_page(item)
+            except detail.NotAZipFile:
+                print("Non-zip file {} encountered. Skipping.".format(item['title']))
         
 def make_channel():
     mychef = PBSChef()
