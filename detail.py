@@ -9,6 +9,10 @@ from ricecooker.classes.files import HTMLZipFile, VideoFile, SubtitleFile, Downl
 
 session = login.session
 
+
+class NotAZipFile(Exception):
+    pass
+
 try:
     os.mkdir("zipcache")
 except FileExistsError:
@@ -20,7 +24,10 @@ def filename_from_url(url):
     return urlparse(url).path.strip("/").replace("/", "__")   
 
 def handle_video_zip(filename):
-    archive = zipfile.ZipFile(filename)       
+    try:
+        archive = zipfile.ZipFile(filename)
+    except zipfile.BadZipFile:
+        raise  # TODO: add proper handling
     filenames = [zipped_file.filename for zipped_file in archive.filelist]
     for badname in ["deed.html", "readme.html", "license.html"]:
         try:
@@ -29,21 +36,30 @@ def handle_video_zip(filename):
             pass # if it's not there, we don't care
     assert len(filenames) in (1,2), "Expected 1 or 2 files in {}, got {}".format(filename, filenames)
     if len(filenames) == 2:
-        subtitle_fn, = [f for f in filenames if f.endswith("vtt")]
-        video_fn, = [f for f in filenames if not f.endswith("vtt")]
+        subtitle_fn = None
+        video_fn = None
+        for f in filenames:
+            if f.endswith("vtt") or f.endswith("txt") or f.endswith('dxfp'):
+                subtitle_fn = f
+            else:
+                video_fn = f
+        assert subtitle_fn and video_fn, "{} has {}".format(filename, filenames)
     else:
         video_fn, = filenames
         subtitle_fn = None
         
     video_ext = video_fn.split(".")[-1]
+    if subtitle_fn:
+        subtitle_ext = subtitle_fn.split(".")[-1]
+
     video_filename = filename + "__video."+video_ext
     with open(video_filename, 'wb') as f:
         f.write(archive.read(video_fn))
     video_file_obj = VideoFile(video_filename, ffmpeg_settings={"crf":24})
     
     subtitle_file_obj = None
-    subtitle_filename = filename + "__subtitle.vtt"
     if subtitle_fn:
+        subtitle_filename = filename + "__subtitle." + subtitle_ext
         with open(subtitle_filename, 'wb') as f:
             f.write(archive.read(subtitle_fn))
         subtitle_file_obj = SubtitleFile(subtitle_filename, language='en')  # TODO: fix lang assumption!
@@ -73,6 +89,7 @@ def get_individual_page(item):
     
     data = {}
     data['link'] = url
+    data['title'] = item['title']
     content = soup.find("div", {'class': 'resource-content'})
     data['full_description'] = '\n'.join(tag.text.strip() for tag in soup.findAll("p")).strip()  # TODO: contains too much junk.
     
@@ -113,6 +130,11 @@ def get_individual_page(item):
             raise
             
             print ("{} bytes written".format(zip_response.headers.get("content-length")))
+            with open(filename, "rb") as f:
+                if f.read(2) != b"PK":
+                    raise NotAZipFile(filename)
+    else:
+        print ("... is cached")
             
     if item['category'] == "Video":
         return handle_video_zip(filename), data
@@ -128,12 +150,13 @@ def download_videos(filename):
         
     i = 0
     for item in database:
+        print (item)
         if item['category'] in ["Video"]: # ("Document", "Audio", "Image", "Video"):
             nodes, data = get_individual_page(item)
-            print (nodes, data)
-            i=i+1
-            if i == 4:
-                break
+            # print (nodes, data)
+            #i=i+1
+            #if i == 4:
+            #    break
     
 if __name__ == "__main__":
     download_videos('share.json')
