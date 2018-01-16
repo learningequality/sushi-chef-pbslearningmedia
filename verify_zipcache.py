@@ -7,5 +7,7 @@ for filename in zip_files:
         read = f.read(2)[:2]
         if read != b"PK":
             print(filename, read)
+            os.remove("zipcache/"+filename)
             bad = bad + 1
-print ("{} bad zip files found".format(bad))
+print ("{} bad zip files found and removed".format(bad))
+

@@ -43,7 +43,10 @@ def handle_video_zip(filename):
                 subtitle_fn = f
             else:
                 video_fn = f
-        assert subtitle_fn and video_fn, "{} has {}".format(filename, filenames)
+        if not (subtitle_fn and video_fn):
+            # there are multiple video files! Choose one at random (the last one based on a sample of one)
+            video_fn = filenames[-1]
+            subtitle_fn = None
     else:
         video_fn, = filenames
         subtitle_fn = None
@@ -132,6 +135,9 @@ def get_individual_page(item):
             print ("{} bytes written".format(zip_response.headers.get("content-length")))
         with open(filename, "rb") as f:
             if f.read(2) != b"PK":
+                print ("Removing bad zip file")
+                os.remove(filename)
+
                 raise NotAZipFile(filename)
     else:
         print ("... is cached as {}".format(filename))
@@ -154,6 +160,7 @@ def download_videos(filename):
         if item['category'] in ["Video"]: # ("Document", "Audio", "Image", "Video"):
             print(i)
             i = i + 1
+            if i < 50: continue
             try:
                 nodes, data = get_individual_page(item)
             except NotAZipFile:
