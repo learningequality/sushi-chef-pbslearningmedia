@@ -31,21 +31,26 @@ def handle_video_zip(filename):
     except zipfile.BadZipFile:
         raise  # TODO: add proper handling
     filenames = [zipped_file.filename for zipped_file in archive.filelist]
+    name_and_size = [(zipped_file.filename, zipped_file.file_size) for zipped_file in archive.filelist]
+    biggest = sorted(name_and_size, key = lambda x: x[1])[-1][0]
+    
     for badname in ["deed.html", "readme.html", "license.html"]:
         try:
             filenames.remove(badname)
         except Exception:
             pass # if it's not there, we don't care
 
-    for badname in [".jpg", "placeholder"]:
+    for badname in [".m3u8", ".m3u", ".jpg", ".htm", ".html"]:
         for f in filenames:
             if f.endswith(badname):
                 filenames.remove(f)
 
     if len(filenames)==0:
         raise NotAZipFile("contained no useful files") # TODO: handle better!
-    assert len(filenames) in (1,2), "Expected 1 or 2 files in {}, got {}".format(filename, filenames)
-    if len(filenames) == 2:
+    elif len(filenames)==1:
+        video_fn, = filenames
+        subtitle_fn = None
+    elif len(filenames) == 2:
         subtitle_fn = None
         video_fn = None
         for f in filenames:
@@ -54,13 +59,18 @@ def handle_video_zip(filename):
             else:
                 video_fn = f
         if not (subtitle_fn and video_fn):
-            # there are multiple video files! Choose one at random (the last one based on a sample of one
-            # TODO: actually verify it's a video file and not eg. a gif.
-            video_fn = filenames[-1]
+            # there are multiple video files? Assume the biggest is the one we want
+            video_fn = biggest
             subtitle_fn = None
     else:
-        video_fn, = filenames
+        # there are a lot of files
+        # find the biggest file and a matching subtitle?
+        video_fn = biggest
         subtitle_fn = None
+        video_base_name = biggest[:-4]
+        for f in filenames:
+            if f.startswith(video_base_name) and f != video_fn:
+                subtitle_fn = f
         
     video_ext = video_fn.split(".")[-1]
     if subtitle_fn:
@@ -75,9 +85,13 @@ def handle_video_zip(filename):
     if video_ext != "mp4":
         mp4_fn = video_filename + ".mp4"
         command = ["ffmpeg", "-i", video_filename, "-vcodec", "h264", "-acodec", "aac", "-strict", "2", 
-            "-crf", "24", "-y", mp4_fn]
-        subprocess.check_call(command)
-        print("Successfully transcoded")
+            "-crf", "24", "-y", "-hide_banner", "-loglevel", "warning", mp4_fn]
+        # note: -n skips if file already exists, use -y to overwrite
+        if not os.path.exists(mp4_fn):
+            subprocess.check_call(command)
+            print("Successfully transcoded")
+        else:
+            print("... used cached MP4")
         video_filename = mp4_fn 
       
     video_file_obj = VideoFile(video_filename, ffmpeg_settings={"crf":24})
@@ -213,7 +227,7 @@ def download_category(category, filename, offset=-1):
 
 
 def download_videos(filename):
-    download_category("Video", filename, offset=815)
+    download_category("Video", filename, offset=1565)
 
 def download_audios(filename):
     download_category("Audio", filename, offset=-1)
