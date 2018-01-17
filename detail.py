@@ -5,10 +5,12 @@ from bs4 import BeautifulSoup
 import os
 import json
 import zipfile
-from ricecooker.classes.files import HTMLZipFile, VideoFile, SubtitleFile, DownloadFile
+from ricecooker.classes.files import HTMLZipFile, VideoFile, SubtitleFile, DownloadFile, AudioFile
+import requests.exceptions
+import sys
+import subprocess
 
 session = login.session
-
 
 class NotAZipFile(Exception):
     pass
@@ -34,6 +36,14 @@ def handle_video_zip(filename):
             filenames.remove(badname)
         except Exception:
             pass # if it's not there, we don't care
+
+    for badname in [".jpg", "placeholder"]:
+        for f in filenames:
+            if f.endswith(badname):
+                filenames.remove(f)
+
+    if len(filenames)==0:
+        raise NotAZipFile("contained no useful files") # TODO: handle better!
     assert len(filenames) in (1,2), "Expected 1 or 2 files in {}, got {}".format(filename, filenames)
     if len(filenames) == 2:
         subtitle_fn = None
@@ -44,7 +54,8 @@ def handle_video_zip(filename):
             else:
                 video_fn = f
         if not (subtitle_fn and video_fn):
-            # there are multiple video files! Choose one at random (the last one based on a sample of one)
+            # there are multiple video files! Choose one at random (the last one based on a sample of one
+            # TODO: actually verify it's a video file and not eg. a gif.
             video_fn = filenames[-1]
             subtitle_fn = None
     else:
@@ -56,8 +67,19 @@ def handle_video_zip(filename):
         subtitle_ext = subtitle_fn.split(".")[-1]
 
     video_filename = filename + "__video."+video_ext
+
     with open(video_filename, 'wb') as f:
         f.write(archive.read(video_fn))
+    
+    # TODO: refactor these non-mp4 hacks.
+    if video_ext != "mp4":
+        mp4_fn = video_filename + ".mp4"
+        command = ["ffmpeg", "-i", video_filename, "-vcodec", "h264", "-acodec", "aac", "-strict", "2", 
+            "-crf", "24", "-y", mp4_fn]
+        subprocess.check_call(command)
+        print("Successfully transcoded")
+        video_filename = mp4_fn 
+      
     video_file_obj = VideoFile(video_filename, ffmpeg_settings={"crf":24})
     
     subtitle_file_obj = None
@@ -67,13 +89,32 @@ def handle_video_zip(filename):
             f.write(archive.read(subtitle_fn))
         subtitle_file_obj = SubtitleFile(subtitle_filename, language='en')  # TODO: fix lang assumption!
         
-    return (video_file_obj, subtitle_file_obj)
-            
     archive.close()
+    return (video_file_obj, subtitle_file_obj)
         
-    
+def handle_audio_zip(filename):
+    try:
+        archive = zipfile.ZipFile(filename)
+    except zipfile.BadZipFile:
+        raise  # TODO: add proper handling
+    filenames = [zipped_file.filename for zipped_file in archive.filelist]
+    for badname in ["deed.html", "readme.html", "license.html"]:
+        try:
+            filenames.remove(badname)
+        except Exception:
+            pass # if it's not there, we don't care
+
+    assert len(filenames) in (1,), "Expected 1 file in {}, got {}".format(filename, filenames)
+    fn, = filenames
         
+    ext = fn.split(".")[-1]
+
+    disk_filename = filename + "__audio."+ext
+    with open(disk_filename, 'wb') as f:
+        f.write(archive.read(fn))
+    file_obj = AudioFile(disk_filename)
     
+    return file_obj
     
 
 def get_individual_page(item):
@@ -86,7 +127,10 @@ def get_individual_page(item):
     
     url = item['link']
     response = session.get(url)
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError:
+        raise NotAZipFile()
     soup = BeautifulSoup(response.content, "html5lib")
     # TODO -- turn this into something useful.
     
@@ -142,35 +186,47 @@ def get_individual_page(item):
     else:
         print ("... is cached as {}".format(filename))
             
-    if item['category'] == "Video":
-        return handle_video_zip(filename), data
+    handlers = {"Video": handle_video_zip,
+                "Audio": handle_audio_zip}
+    if item['category'] in handlers:
+        return handlers[item['category']](filename), data
     else:
         raise NotImplementedError
 
 #login.login()
 #get_individual_page(sample_url, get_zip=False)
-
-def download_videos(filename):
+def download_category(category, filename, offset=-1):
     with open(filename) as f:
         database = [json.loads(line) for line in f.readlines()]
         
     i = 0
     for item in database:
         print (item)
-        if item['category'] in ["Video"]: # ("Document", "Audio", "Image", "Video"):
-            print(i)
+        if item['category'] == category: # ["Video", "Document", "Audio", "Image", "Video"]
+            print(category, i)
             i = i + 1
-            if i < 50: continue
+            if i < offset: continue
             try:
                 nodes, data = get_individual_page(item)
             except NotAZipFile:
                 continue
-            # print (nodes, data)
-            #if i == 4:
-            #    break
+
+
+def download_videos(filename):
+    download_category("Video", filename, offset=815)
+
+def download_audios(filename):
+    download_category("Audio", filename, offset=-1)
+
+
     
 if __name__ == "__main__":
-    download_videos('share.json')
+    if len(sys.argv) == 1:
+        print("add video or audio etc.")
+    if 'video' in sys.argv:
+        download_videos('share.json')
+    if 'audio' in sys.argv:
+        download_audios('share.json')
 #download_videos('modify.json')
 #download_videos('download.json')
 

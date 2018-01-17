@@ -1,0 +1,12 @@
+login.py: just log-in script -- imported by detail, also provides logged in session
+index.py: saves indexes as json files -- not imported, but json files used directly
+detail.py: parses json files from index and returns video data using a cache
+souschef.py: imports detail, uploads to kolibri
+zipscan.py: stand alone: identifies extensions we care about within all zip files.
+
+currently downloading shared videos [slow]
+
+done: shared audio
+
+ffmpeg -i demo.mov -vcodec h264 -acodec aac -strict 2 demo.mp4
+ffmpeg -i demo.mov -vcodec h264 -acodec aac -strict 2 -crf 24 demo.mp4

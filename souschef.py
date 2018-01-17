@@ -4,7 +4,7 @@ import sys
 sys.path.append(os.getcwd()) # Handle relative imports
 import requests
 from le_utils.constants import licenses
-from ricecooker.classes.nodes import DocumentNode, VideoNode
+from ricecooker.classes.nodes import DocumentNode, VideoNode, AudioNode
 from ricecooker.classes.files import HTMLZipFile, VideoFile, SubtitleFile, DownloadFile
 from ricecooker.chefs import SushiChef
 import logging
@@ -26,11 +26,20 @@ class PBSChef(SushiChef):
     }
 
     def construct_channel(self, **kwargs):
+        def audio_node(audio, data):
+            print (data['title'])
+            return AudioNode(source_id=data['link'],
+                             title=data['title'],
+                             description=data['full_description'], # TODO: see below
+                             license = licenses.CC_BY_NC_SA,
+                             copyright_holder="PBS Learning Media",
+                             files = [audio,])
+
         def video_node(video, subtitle, data):
             if subtitle:
                 files = [video, subtitle]
             else:
-                files = [video]
+                files = [video,]
             print (data['title'])
             return VideoNode(source_id=data['link'],
                              title=data['title'],
@@ -45,24 +54,39 @@ class PBSChef(SushiChef):
         # create a topic and add it to channel
         data = {}
         
+        i=0
+        for audio, data in download_audios("share.json"):
+            channel.add_child(audio_node(audio, data))
+            i=i+1
+            if i>10: break # TODO: remove
         
         i=0
         for (video, subtitle), data in download_videos("share.json"):
             channel.add_child(video_node(video, subtitle, data))
             i=i+1
-            if i>10: break
+            if i>10: break # TODO: remove
+
         return channel
     
-def download_videos(jsonfile):
+def download_category(category, jsonfile):
     with open(jsonfile) as f:
         database = [json.loads(line) for line in f.readlines()]
         
     for item in database:
-        if item['category'] in ["Video"]: # ("Document", "Audio", "Image", "Video"):
+        if item['category'] == category: #  ["Video"]: # ("Document", "Audio", "Image", "Video"):
             try:
                 yield detail.get_individual_page(item)
             except detail.NotAZipFile:
                 print("Non-zip file {} encountered. Skipping.".format(item['title']))
+
+
+def download_videos(jsonfile):
+    for i in download_category('Video', jsonfile):
+        yield i
+
+def download_audios(jsonfile):
+    for i in download_category('Audio', jsonfile):
+        yield i
         
 def make_channel():
     mychef = PBSChef()
