@@ -10,4 +10,7 @@ for filename in zip_files:
             os.remove("zipcache/"+filename)
             bad = bad + 1
 print ("{} bad zip files found and removed".format(bad))
-
+for filename in all_files:
+    size = os.stat("zipcache/" + filename).st_size
+    if size == 0:
+        print(filename, 0)

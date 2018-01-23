@@ -26,16 +26,30 @@ class PBSChef(SushiChef):
     }
 
     def construct_channel(self, **kwargs):
-        def audio_node(audio, data):
+        def audio_node(audio, data, license_type):
             print (data['title'])
             return AudioNode(source_id=data['link'],
                              title=data['title'],
                              description=data['full_description'], # TODO: see below
-                             license = licenses.CC_BY_NC_SA,
+                             license = license_type,
                              copyright_holder="PBS Learning Media",
                              files = [audio,])
 
-        def video_node(video, subtitle, data):
+        def document_node(document, data, license_type):
+            print (data['title'])
+            if document.get_filename().lower().endswith(".pdf"):
+                node = DocumentNode
+            else:
+                node = DownloadNode
+                return node(source_id=data['link'],
+                                title=data['title'],
+                                description=data['full_description'], # TODO: see below
+                                license = license_type,
+                                copyright_holder="PBS Learning Media",
+                                files = [document,])
+
+
+        def video_node(video, subtitle, data, license_type):
             if subtitle:
                 files = [video, subtitle]
             else:
@@ -44,34 +58,35 @@ class PBSChef(SushiChef):
             return VideoNode(source_id=data['link'],
                              title=data['title'],
                              description=data['full_description'],  # TODO: get full descriptiom
-                             license=licenses.CC_BY_NC_SA, 
+                             license=license_type, 
                              copyright_holder="PBS Learning Media",
                              files=files,
                              )            
-            
+        
+
+    
         # create channel
         channel = self.get_channel(**kwargs)
         # create a topic and add it to channel
         data = {}
         
-        i=0
+#        for doc, data in download_docs("share.json"):
+#            channel.add_child(document_node(doc, data, licenses.CC_BY_NC_ND)) # was _SA
         for audio, data in download_audios("share.json"):
-            channel.add_child(audio_node(audio, data))
-            i=i+1
-            if i>10: break # TODO: remove
-        
-        i=0
+            channel.add_child(audio_node(audio, data, licenses.CC_BY_NC_ND)) # was _SA
         for (video, subtitle), data in download_videos("share.json"):
-            channel.add_child(video_node(video, subtitle, data))
-            i=i+1
-            if i>10: break # TODO: remove
-
+            channel.add_child(video_node(video, subtitle, data, licenses.CC_BY_NC_ND)) # was _SA
         return channel
+
     
-def download_category(category, jsonfile):
+def download_category(category, jsonfile, make_unique=False):
     with open(jsonfile) as f:
-        database = [json.loads(line) for line in f.readlines()]
-        
+        if make_unique:
+            # for some reason there are some duplicates in the database -- probably due to pagination issues when crawling.
+            lines = set(f.readlines())
+        else:
+            lines = f.readlines()
+    database = [json.loads(line) for line in lines]
     for item in database:
         if item['category'] == category: #  ["Video"]: # ("Document", "Audio", "Image", "Video"):
             try:
@@ -87,7 +102,11 @@ def download_videos(jsonfile):
 def download_audios(jsonfile):
     for i in download_category('Audio', jsonfile):
         yield i
-        
+       
+def download_docs(jsonfile):
+    for i in download_category("Document", jsonfile, make_unique=True):
+        yield i
+ 
 def make_channel():
     mychef = PBSChef()
     args = {'token': os.environ['KOLIBRI_STUDIO_TOKEN'], 'reset': True, 'verbose': True}

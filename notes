@@ -4,9 +4,22 @@ detail.py: parses json files from index and returns video data using a cache
 souschef.py: imports detail, uploads to kolibri
 zipscan.py: stand alone: identifies extensions we care about within all zip files.
 
-currently downloading shared videos [slow]
+currently downloading shared videos [slow - many - 4063?4? divisible by 2]
+5831 broken
 
-done: shared audio
+
+downloaded: shared and modified docs, audio, videos
 
 ffmpeg -i demo.mov -vcodec h264 -acodec aac -strict 2 demo.mp4
 ffmpeg -i demo.mov -vcodec h264 -acodec aac -strict 2 -crf 24 demo.mp4
+
+-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" may fix 4064 -- might need to delete (0 byte?) mp4 file though.
+
+TODO:
+(done) licencing -- by source json
+education tab
+continue processing share/modify.json
+more filetypes etc.
+structure -- nesting etc
+collections!
+Document only supports pdf not docx

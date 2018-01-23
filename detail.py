@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import os
 import json
 import zipfile
-from ricecooker.classes.files import HTMLZipFile, VideoFile, SubtitleFile, DownloadFile, AudioFile
+from ricecooker.classes.files import HTMLZipFile, VideoFile, SubtitleFile, DownloadFile, AudioFile, DocumentFile
 import requests.exceptions
 import sys
 import subprocess
@@ -85,7 +85,7 @@ def handle_video_zip(filename):
     if video_ext != "mp4":
         mp4_fn = video_filename + ".mp4"
         command = ["ffmpeg", "-i", video_filename, "-vcodec", "h264", "-acodec", "aac", "-strict", "2", 
-            "-crf", "24", "-y", "-hide_banner", "-loglevel", "warning", mp4_fn]
+            "-crf", "24", "-y", "-hide_banner", "-loglevel", "warning", "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", mp4_fn]
         # note: -n skips if file already exists, use -y to overwrite
         if not os.path.exists(mp4_fn):
             subprocess.check_call(command)
@@ -106,7 +106,7 @@ def handle_video_zip(filename):
     archive.close()
     return (video_file_obj, subtitle_file_obj)
         
-def handle_audio_zip(filename):
+def handle_simple_zip(filename, file_class): # file_class = AudioFile for example
     try:
         archive = zipfile.ZipFile(filename)
     except zipfile.BadZipFile:
@@ -126,10 +126,15 @@ def handle_audio_zip(filename):
     disk_filename = filename + "__audio."+ext
     with open(disk_filename, 'wb') as f:
         f.write(archive.read(fn))
-    file_obj = AudioFile(disk_filename)
+    file_obj = file_class(disk_filename)
     
     return file_obj
+
+def handle_audio_zip(filename):
+    return handle_simple_zip(filename, AudioFile)
     
+def handle_doc_zip(filename):
+    return handle_simple_zip(filename, DocumentFile)
 
 def get_individual_page(item):
     # works for audio, individual images, 
@@ -152,7 +157,7 @@ def get_individual_page(item):
     data['link'] = url
     data['title'] = item['title']
     content = soup.find("div", {'class': 'resource-content'})
-    data['full_description'] = '\n'.join(tag.text.strip() for tag in soup.findAll("p")).strip()  # TODO: contains too much junk.
+    data['full_description'] = '\n'.join(tag.text.strip() for tag in content.findAll("p")).strip()  # TODO: contains too much junk.
     
     support = soup.findAll("div", {"class": "accordion-menu"}) 
     for accordion in support:  # Education is empty in source... TODO: remove it!
@@ -171,7 +176,13 @@ def get_individual_page(item):
     target = urljoin(url, form.attrs['action'])
 
     # Note: redirection URL valid only for an hour or so.
-    zip_response = session.post(target, data={"agree": "on"}, stream=True)
+    while True:
+        try:
+            zip_response = session.post(target, data={"agree": "on"}, stream=True)
+        except Exception as e:
+            print("problem with post", e)
+        else:
+            break
     filename = "zipcache/"+filename_from_url(url)+".zip"
     if not os.path.exists(filename):
         print ("Downloading zip to {}".format(filename))
@@ -201,7 +212,8 @@ def get_individual_page(item):
         print ("... is cached as {}".format(filename))
             
     handlers = {"Video": handle_video_zip,
-                "Audio": handle_audio_zip}
+                "Audio": handle_audio_zip,
+                "Document": handle_doc_zip}
     if item['category'] in handlers:
         return handlers[item['category']](filename), data
     else:
@@ -227,20 +239,29 @@ def download_category(category, filename, offset=-1):
 
 
 def download_videos(filename):
-    download_category("Video", filename, offset=1565)
+    download_category("Video", filename, offset=1689)
 
 def download_audios(filename):
     download_category("Audio", filename, offset=-1)
 
-
+def download_docs(filename):
+    download_category("Document", filename, offset=-1)
     
 if __name__ == "__main__":
     if len(sys.argv) == 1:
         print("add video or audio etc.")
     if 'video' in sys.argv:
         download_videos('share.json')
+    if 'videom' in sys.argv:
+        download_videos('modify.json')
     if 'audio' in sys.argv:
         download_audios('share.json')
+    if 'doc' in sys.argv:
+        download_docs('share.json')
+    if 'audiom' in sys.argv:
+        download_audios("modify.json")
+    if "docm" in sys.argv:
+        download_docs("modify.json")
 #download_videos('modify.json')
 #download_videos('download.json')
 
