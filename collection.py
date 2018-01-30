@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 import json
 import re
 import requests_cache
+import string
 requests_cache.install_cache()
 
 def make_links_absolute(soup, url):
@@ -46,12 +47,12 @@ for item in crawl:
 class Category(object):
     def __init__(self):
         self.title = None
-        self.text = None
+        self.description = None
         self.url = None
         self.resources = []
         self.category_links = []
         self.categories = []
-
+    
     def __repr__(self):
         if self.categories:
             return "<{}: {} ({})>".format(self.title, self.categories, len(self.resources))
@@ -67,6 +68,7 @@ def crawl_collection(url):
     return collection
 
 def crawl_category(url):
+    assert type(url) == str, type(url)
     category = Category()
     category.url = url
     response = requests.get(url)
@@ -77,7 +79,7 @@ def crawl_category(url):
     make_links_absolute(soup, url)
     category.title = soup.find("h2", {'class': 'coll-title'}).text.strip()
     texts = soup.find("div", {'id': 'coll-default-text'}).find_all("p")
-    category.text = '\n'.join([t.text.strip() for t in texts])
+    category.description = '\n'.join([t.text.strip() for t in texts])
     raw_index = soup.find("ul", {'class': 'js-open'}).find_all("li", {"class": 'topics-item'})
     list_index = [i.find("a") for i in raw_index]
     index = [(i.text.strip(), i.attrs['href']) for i in list_index]
@@ -96,10 +98,14 @@ def crawl_category(url):
         if link not in crawl_dict:
             print ("{} not crawled".format(link))
             continue # skip
-        # item_data['title'] = li.find("h2").find("a").text
-        # descr = li.find("div", {"class": 'long-description'}).find_all("p")
-        # item_data['description'] = '\n'.join([t.text.strip() for t in descr])
-        category.resources.append(crawl_dict[link])
+        item_data = dict(crawl_dict[link])
+        item_data['title'] = crawl_dict[link]['title']
+        item_data['full_description'] = crawl_dict[link]['description']
+        #item_data['title'] = li.find("h2").find("a").text
+        #descr = li.find("div", {"class": 'long-description'}).find_all("p")
+        #item_data['description'] = '\n'.join([t.text.strip() for t in descr])
+        
+        category.resources.append(item_data)
     return category
 
 
