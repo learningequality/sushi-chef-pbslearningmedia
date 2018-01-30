@@ -14,3 +14,12 @@ more filetypes etc.
 structure -- nesting etc
 collections!
 Document only supports pdf not docx
+
+
+
+# detail.get_individual_page(item) -- item dict has link, category to handle it
+# returns (video_file, subtitle_file) or (file_obj) which are kolibri file objects
+# 
+
+# collections.crawl_collection(url) -- returns collection structure:
+# title, text, url, resources[], categories[] (each category has the same structure minus categories[])

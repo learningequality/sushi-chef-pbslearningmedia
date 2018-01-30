@@ -25,6 +25,25 @@ sample_url="https://ca.pbslearningmedia.org/resource/vtl07.la.rv.text.cats/cats/
 def filename_from_url(url):
     return urlparse(url).path.strip("/").replace("/", "__")   
 
+
+def reencode(source_filename, file_format):    # TODO: refactor these non-mp4 hacks.
+    # note: -n skips if file already exists, use -y to overwrite
+    if file_format == "mp4":
+        new_fn = video_filename + ".mp4"
+        command = ["ffmpeg", "-i", source_filename, "-vcodec", "h264", "-acodec", "aac", "-strict", "2", 
+                   "-crf", "24", "-y", "-hide_banner", "-loglevel", "warning", "-vf",
+                   "scale=trunc(iw/2)*2:trunc(ih/2)*2", new_fn]
+    if file_format == "mp3":
+        new_fn = source_filename + ".mp3"
+        command = ["ffmpeg", "-i", source_filename, "-acodec", "mp3", "-ac", "2", "-ab", "192k", 
+                   "-y", "-hide_banner", "-loglevel", "warning", new_fn]
+    if not os.path.exists(new_fn):
+        subprocess.check_call(command)
+        print("Successfully transcoded")
+    else:
+        print("... used cached file")
+    return new_fn
+
 def handle_video_zip(filename):
     try:
         archive = zipfile.ZipFile(filename)
@@ -83,17 +102,8 @@ def handle_video_zip(filename):
     
     # TODO: refactor these non-mp4 hacks.
     if video_ext != "mp4":
-        mp4_fn = video_filename + ".mp4"
-        command = ["ffmpeg", "-i", video_filename, "-vcodec", "h264", "-acodec", "aac", "-strict", "2", 
-            "-crf", "24", "-y", "-hide_banner", "-loglevel", "warning", "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", mp4_fn]
-        # note: -n skips if file already exists, use -y to overwrite
-        if not os.path.exists(mp4_fn):
-            subprocess.check_call(command)
-            print("Successfully transcoded")
-        else:
-            print("... used cached MP4")
-        video_filename = mp4_fn 
-      
+        video_filename = reencode(video_filename, "mp4")
+ 
     video_file_obj = VideoFile(video_filename, ffmpeg_settings={"crf":24})
     
     subtitle_file_obj = None
@@ -106,7 +116,7 @@ def handle_video_zip(filename):
     archive.close()
     return (video_file_obj, subtitle_file_obj)
         
-def handle_simple_zip(filename, file_class): # file_class = AudioFile for example
+def handle_simple_zip(filename, file_class, permitted_ext): # file_class = AudioFile for example
     try:
         archive = zipfile.ZipFile(filename)
     except zipfile.BadZipFile:
@@ -122,19 +132,22 @@ def handle_simple_zip(filename, file_class): # file_class = AudioFile for exampl
     fn, = filenames
         
     ext = fn.split(".")[-1]
-
-    disk_filename = filename + "__audio."+ext
+    disk_filename = filename + "__audio."+ext # should probably be simple not audio TODO
     with open(disk_filename, 'wb') as f:
         f.write(archive.read(fn))
+    
+    if ext.lower() != permitted_ext:  # this doesn't handle other types of file!
+        print ("{} found, {} expected".format(ext, permitted_ext))
+        disk_filename = reencode(disk_filename, permitted_ext)
     file_obj = file_class(disk_filename)
     
     return file_obj
 
 def handle_audio_zip(filename):
-    return handle_simple_zip(filename, AudioFile)
+    return handle_simple_zip(filename, AudioFile, "mp3")
     
 def handle_doc_zip(filename):
-    return handle_simple_zip(filename, DocumentFile)
+    return handle_simple_zip(filename, DocumentFile, "docx")
 
 def get_individual_page(item):
     # works for audio, individual images, 
@@ -145,7 +158,14 @@ def get_individual_page(item):
     # lesson plan -- appears to not be its own thing, mostly. At least one is v. lon
     
     url = item['link']
-    response = session.get(url)
+    while True:
+        try:
+            response = session.get(url)
+        except Exception as e:
+            print (e)
+        else:
+            break
+         
     try:
         response.raise_for_status()
     except requests.exceptions.HTTPError:

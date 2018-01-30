@@ -79,7 +79,7 @@ class PBSChef(SushiChef):
         return channel
 
     
-def download_category(category, jsonfile, make_unique=False):
+def download_category(category, jsonfile, make_unique=True):
     with open(jsonfile) as f:
         if make_unique:
             # for some reason there are some duplicates in the database -- probably due to pagination issues when crawling.
@@ -104,7 +104,7 @@ def download_audios(jsonfile):
         yield i
        
 def download_docs(jsonfile):
-    for i in download_category("Document", jsonfile, make_unique=True):
+    for i in download_category("Document", jsonfile):
         yield i
  
 def make_channel():
