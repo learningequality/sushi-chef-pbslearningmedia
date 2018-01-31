@@ -29,14 +29,17 @@ def filename_from_url(url):
 def reencode(source_filename, file_format):    # TODO: refactor these non-mp4 hacks.
     # note: -n skips if file already exists, use -y to overwrite
     if file_format == "mp4":
-        new_fn = video_filename + ".mp4"
+        new_fn = source_filename + ".mp4"
         command = ["ffmpeg", "-i", source_filename, "-vcodec", "h264", "-acodec", "aac", "-strict", "2", 
                    "-crf", "24", "-y", "-hide_banner", "-loglevel", "warning", "-vf",
                    "scale=trunc(iw/2)*2:trunc(ih/2)*2", new_fn]
-    if file_format == "mp3":
+    elif file_format == "mp3":
         new_fn = source_filename + ".mp3"
         command = ["ffmpeg", "-i", source_filename, "-acodec", "mp3", "-ac", "2", "-ab", "192k", 
                    "-y", "-hide_banner", "-loglevel", "warning", new_fn]
+    else:
+        return None 
+
     if not os.path.exists(new_fn):
         subprocess.check_call(command)
         print("Successfully transcoded")
@@ -73,7 +76,7 @@ def handle_video_zip(filename):
         subtitle_fn = None
         video_fn = None
         for f in filenames:
-            if f.endswith("vtt") or f.endswith("txt") or f.endswith('dxfp'):
+            if f.endswith("vtt"):# or f.endswith("txt") or f.endswith('dxfp'):
                 subtitle_fn = f
             else:
                 video_fn = f
@@ -81,6 +84,7 @@ def handle_video_zip(filename):
             # there are multiple video files? Assume the biggest is the one we want
             video_fn = biggest
             subtitle_fn = None
+        
     else:
         # there are a lot of files
         # find the biggest file and a matching subtitle?
@@ -136,7 +140,7 @@ def handle_simple_zip(filename, file_class, permitted_ext): # file_class = Audio
     with open(disk_filename, 'wb') as f:
         f.write(archive.read(fn))
     
-    if ext.lower() != permitted_ext:  # this doesn't handle other types of file!
+    if ext.lower() != permitted_ext: # this doesn't handle other types of file!
         print ("{} found, {} expected".format(ext, permitted_ext))
         disk_filename = reencode(disk_filename, permitted_ext)
     file_obj = file_class(disk_filename)
@@ -233,14 +237,13 @@ def get_individual_page(item):
             
     handlers = {"Video": handle_video_zip,
                 "Audio": handle_audio_zip,
-                "Document": handle_doc_zip}
+                #"Document": handle_doc_zip
+               }
     if item['category'] in handlers:
         return handlers[item['category']](filename), data
     else:
-        raise NotImplementedError
+        raise NotImplementedError(item['category'])
 
-#login.login()
-#get_individual_page(sample_url, get_zip=False)
 def download_category(category, filename, offset=-1):
     with open(filename) as f:
         database = [json.loads(line) for line in f.readlines()]
@@ -264,8 +267,8 @@ def download_videos(filename):
 def download_audios(filename):
     download_category("Audio", filename, offset=-1)
 
-def download_docs(filename):
-    download_category("Document", filename, offset=-1)
+#def download_docs(filename):
+#    download_category("Document", filename, offset=-1)
     
 if __name__ == "__main__":
     if len(sys.argv) == 1:
@@ -276,12 +279,12 @@ if __name__ == "__main__":
         download_videos('modify.json')
     if 'audio' in sys.argv:
         download_audios('share.json')
-    if 'doc' in sys.argv:
-        download_docs('share.json')
+#    if 'doc' in sys.argv:
+#        download_docs('share.json')
     if 'audiom' in sys.argv:
         download_audios("modify.json")
-    if "docm" in sys.argv:
-        download_docs("modify.json")
+#    if "docm" in sys.argv:
+#        download_docs("modify.json")
 #download_videos('modify.json')
 #download_videos('download.json')
 

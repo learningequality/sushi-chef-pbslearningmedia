@@ -35,18 +35,18 @@ class PBSChef(SushiChef):
                              copyright_holder="PBS Learning Media",
                              files = [audio,])
 
-        def document_node(document, data, license_type):
-            print (data['title'])
-            if document.get_filename().lower().endswith(".pdf"):
-                node = DocumentNode
-            else:
-                node = DownloadNode
-                return node(source_id=data['link'],
-                                title=data['title'],
-                                description=data['full_description'], # TODO: see below
-                                license = license_type,
-                                copyright_holder="PBS Learning Media",
-                                files = [document,])
+        #def document_node(document, data, license_type):
+        #    print (data['title'])
+        #    if document.get_filename().lower().endswith(".pdf"):
+        #        node = DocumentNode
+        #    else:
+        #        node = DownloadNode
+        #        return node(source_id=data['link'],
+        #                        title=data['title'],
+        #                        description=data['full_description'], # TODO: see below
+        #                        license = license_type,
+        #                        copyright_holder="PBS Learning Media",
+        #                        files = [document,])
 
 
         def video_node(video, subtitle, data, license_type):
@@ -93,6 +93,8 @@ def download_category(category, jsonfile, make_unique=True):
                 yield detail.get_individual_page(item)
             except detail.NotAZipFile:
                 print("Non-zip file {} encountered. Skipping.".format(item['title']))
+            except NotImplementedError:
+                pass
 
 
 def download_videos(jsonfile):
@@ -103,9 +105,9 @@ def download_audios(jsonfile):
     for i in download_category('Audio', jsonfile):
         yield i
        
-def download_docs(jsonfile):
-    for i in download_category("Document", jsonfile):
-        yield i
+#def download_docs(jsonfile):
+#    for i in download_category("Document", jsonfile):
+#        yield i
  
 def make_channel():
     mychef = PBSChef()

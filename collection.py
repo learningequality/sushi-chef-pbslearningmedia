@@ -68,19 +68,31 @@ def crawl_collection(url):
     return collection
 
 def crawl_category(url):
+    # TODO pagination: https://ca.pbslearningmedia.org/collection/idptv/ -> /idptv/2
+    # next page is contained in //li[@class='coll-next']/a/@href
+    print ('Category', url)
     assert type(url) == str, type(url)
     category = Category()
     category.url = url
     response = requests.get(url)
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except Exception:
+        return category
     with open("out.html", "wb") as f:
         f.write(response.content)
     soup = BeautifulSoup(response.content, "html5lib")
     make_links_absolute(soup, url)
     category.title = soup.find("h2", {'class': 'coll-title'}).text.strip()
-    texts = soup.find("div", {'id': 'coll-default-text'}).find_all("p")
-    category.description = '\n'.join([t.text.strip() for t in texts])
-    raw_index = soup.find("ul", {'class': 'js-open'}).find_all("li", {"class": 'topics-item'})
+    try:
+        texts = soup.find("div", {'id': 'coll-default-text'}).find_all("p")
+        category.description = '\n'.join([t.text.strip() for t in texts])
+    except AttributeError:
+        category.description = ""
+    try:
+        raw_index = soup.find("ul", {'class': 'js-open'}).find_all("li", {"class": 'topics-item'})
+    except AttributeError:
+        raw_index = []
     list_index = [i.find("a") for i in raw_index]
     index = [(i.text.strip(), i.attrs['href']) for i in list_index]
     category.category_links = index  # only really relevant for collections!
@@ -94,7 +106,10 @@ def crawl_category(url):
     else:
         lis = []
     for li in lis:
-        link = li.find("h2").find("a").attrs['href']
+        try:
+            link = li.find("h2").find("a").attrs['href']
+        except Exception:
+            continue # rare issue found on https://ca.pbslearningmedia.org/collection/new-to-learningmedia/
         if link not in crawl_dict:
             print ("{} not crawled".format(link))
             continue # skip
