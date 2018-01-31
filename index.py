@@ -76,7 +76,8 @@ def index_collection(url):
 if __name__ == "__main__":
     #save_index({"selected_facets":"permitted_use_exact:Stream, Download, Share, and Modify"}, "modify.json")
     #save_index({"q": "kitten"}, "kitten.json")
-    save_index({"selected_facets":"permitted_use_exact:Stream, Download and Share"}, "share.json")
-    save_index({"selected_facets":"permitted_use_exact:Stream and Download"}, "download.json")
+    save_index({"selected_facets":"media_type_exact:Collection"}, "collection.json")
+    #save_index({"selected_facets":"permitted_use_exact:Stream, Download and Share"}, "share.json")
+    #save_index({"selected_facets":"permitted_use_exact:Stream and Download"}, "download.json")
     #search_index({"selected_facets":"permitted_use_exact:Stream Only"}, "stream.json") 
         
