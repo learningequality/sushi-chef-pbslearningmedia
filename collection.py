@@ -94,7 +94,10 @@ def crawl_category(url):
     except AttributeError:
         raw_index = []
     list_index = [i.find("a") for i in raw_index]
-    index = [(i.text.strip(), i.attrs['href']) for i in list_index]
+    try:
+        index = [(i.text.strip(), i.attrs['href']) for i in list_index]
+    except AttributeError:
+        index = []
     category.category_links = index  # only really relevant for collections!
 
     # individual items
