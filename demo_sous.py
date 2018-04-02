@@ -87,20 +87,20 @@ class PBSChef(SushiChef):
                                           description=category.description, )#category.description)
                 print(category)
                 for resource in category.resources:
-                     print(resource)
-                     try:
+                    print(resource)
+                    try:
                         res, data = detail.get_individual_page(resource)
-                     except Exception:
+                    except Exception:
                         continue
-                     collection_contains_data = True
-                     category_contains_data = True
-                     if type(res) in [AudioFile, DocumentFile]:
-                         print(type(res))
-                         resource_node = node_function[type(res)](res, data, licenses.CC_BY_NC_ND) # TOOD FIX LICENCE!
-                     else:
-                         print ("video")
-                         resource_node = video_node(res[0], res[1], data, licenses.CC_BY_NC_ND) # TODO FIX LICENCE!
-                     category_node.add_child(resource_node)
+                    collection_contains_data = True
+                    category_contains_data = True
+                    if type(res) in [AudioFile, DocumentFile]:
+                        print(type(res))
+                        resource_node = node_function[type(res)](res, data, licenses.CC_BY_NC_ND) # TOOD FIX LICENCE!
+                    else:
+                        print ("video")
+                        resource_node = video_node(res[0], res[1], data, licenses.CC_BY_NC_ND) # TODO FIX LICENCE!
+                    category_node.add_child(resource_node)
                 if category_contains_data:
                     topic_node.add_child(category_node)
                 else:

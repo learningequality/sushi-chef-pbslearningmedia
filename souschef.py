@@ -4,7 +4,7 @@ import sys
 sys.path.append(os.getcwd()) # Handle relative imports
 import requests
 from le_utils.constants import licenses
-from ricecooker.classes.nodes import DocumentNode, VideoNode, AudioNode
+from ricecooker.classes.nodes import DocumentNode, VideoNode, AudioNode, TopicNode
 from ricecooker.classes.files import HTMLZipFile, VideoFile, SubtitleFile, DownloadFile
 from ricecooker.chefs import SushiChef
 import logging
@@ -26,6 +26,20 @@ class PBSChef(SushiChef):
     }
 
     def construct_channel(self, **kwargs):
+        def first_letter(title):
+            if title.upper().startswith("THE "):
+                return first_letter(title[4:])
+            if title.upper().startswith("A "):
+                return first_letter(title[2:])
+            
+            for char in title.upper():
+                if char in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+                    return char
+                if char in "01234567890":
+                    return "#"
+            return "#" # no alphanumeric at all?
+                
+        
         def audio_node(audio, data, license_type):
             print (data['title'])
             return AudioNode(source_id=data['link'],
@@ -67,15 +81,30 @@ class PBSChef(SushiChef):
     
         # create channel
         channel = self.get_channel(**kwargs)
+        letters = {}
+        for letter in "#ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            letters[letter] = TopicNode(source_id="letter-"+letter,
+                                        title=letter, # coll_struct.title,
+                                        description="Resources starting with "+ letter)
+            channel.add_child(letters[letter])
+            
         # create a topic and add it to channel
         data = {}
         
 #        for doc, data in download_docs("share.json"):
 #            channel.add_child(document_node(doc, data, licenses.CC_BY_NC_ND)) # was _SA
         for audio, data in download_audios("share.json"):
-            channel.add_child(audio_node(audio, data, licenses.CC_BY_NC_ND)) # was _SA
+            letter = first_letter(data['title'])
+            letters[letter].add_child(audio_node(audio, data, licenses.CC_BY_NC_ND)) # was _SA
         for (video, subtitle), data in download_videos("share.json"):
-            channel.add_child(video_node(video, subtitle, data, licenses.CC_BY_NC_ND)) # was _SA
+            letter = first_letter(data['title'])
+            letters[letter].add_child(video_node(video, subtitle, data, licenses.CC_BY_NC_ND)) # was _SA
+        for audio, data in download_audios("modify.json"):
+            letter = first_letter(data['title'])
+            letters[letter].add_child(audio_node(audio, data, licenses.CC_BY_NC_ND)) # was _SA
+        for (video, subtitle), data in download_videos("modify.json"):
+            letter = first_letter(data['title'])
+            letters[letter].add_child(video_node(video, subtitle, data, licenses.CC_BY_NC_ND)) # was _SA
         return channel
 
     
