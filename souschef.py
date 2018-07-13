@@ -16,9 +16,11 @@ LOGGER = logging.getLogger()
 
 
 class PBSChef(SushiChef):
+    # hierarchy = # open reverse.json and parse
+    
     channel_info = {
         'CHANNEL_SOURCE_DOMAIN': 'pbslearningmedia.org', # who is providing the content (e.g. learningequality.org)
-        'CHANNEL_SOURCE_ID': 'pbslearningmedia',         # channel's unique id
+        'CHANNEL_SOURCE_ID': 'dragon__pbslearningmedia',         # channel's unique id
         'CHANNEL_TITLE': 'PBS Learning Media',
         'CHANNEL_LANGUAGE': 'en',                          # Use language codes from le_utils
         # 'CHANNEL_THUMBNAIL': 'https://im.openupresources.org/assets/im-logo.svg', # (optional) local path or url to image file
@@ -38,6 +40,16 @@ class PBSChef(SushiChef):
                 if char in "01234567890":
                     return "#"
             return "#" # no alphanumeric at all?
+        
+        def handle_resource_node(resource_node):
+            # handle hierarchy
+            categories = reverse_lookup.get(data['link'], [])
+            for cat in categories:
+                cat_nodes[tuple(cat)].add_child(resource_node) # contains implicit assertion that contents exist
+        
+            # handle alphabet
+            letter = first_letter(data['title'])
+            letters[letter].add_child(resource_node) # was _SA        
                 
         
         def audio_node(audio, data, license_type):
@@ -82,29 +94,74 @@ class PBSChef(SushiChef):
         # create channel
         channel = self.get_channel(**kwargs)
         letters = {}
+        alphabetical_index = TopicNode(source_id="alphabetical",
+                                       title="Alphabetical Index",
+                                       description="All resources, by initial letter")
+        channel.add_child(alphabetical_index)
         for letter in "#ABCDEFGHIJKLMNOPQRSTUVWXYZ":
             letters[letter] = TopicNode(source_id="letter-"+letter,
                                         title=letter, # coll_struct.title,
                                         description="Resources starting with "+ letter)
-            channel.add_child(letters[letter])
+            alphabetical_index.add_child(letters[letter])
+
+        
+        category_index = TopicNode(source_id="category",
+                                   title = "Categorical Index",
+                                   description="")
+        cat_nodes = {}
+        channel.add_child(category_index)
+        with open("reverse.json") as f:
+            reverse_lookup = json.load(f)
+        with open("hierarchy.json") as f:
+            hierarchy = json.load(f)
+        for top_level in hierarchy:
+            top_name, sub_level = hierarchy[top_level]
+            top_node = TopicNode(source_id="cat_{}".format(top_level),
+                                 title=top_name)
+            category_index.add_child(top_node)
+            for sub_item in sub_level:
+                sub_name, sub_id = sub_item
+                sub_node = TopicNode(source_id="cat_{}".format(sub_id),
+                                     title=sub_name)
+                top_node.add_child(sub_node)
+                cat_nodes[(top_name, sub_name)] = sub_node
+                
+                
+                
+                
+                
+            
             
         # create a topic and add it to channel
         data = {}
         
 #        for doc, data in download_docs("share.json"):
 #            channel.add_child(document_node(doc, data, licenses.CC_BY_NC_ND)) # was _SA
+        i = 0
         for audio, data in download_audios("share.json"):
-            letter = first_letter(data['title'])
-            letters[letter].add_child(audio_node(audio, data, licenses.CC_BY_NC_ND)) # was _SA
-        for (video, subtitle), data in download_videos("share.json"):
-            letter = first_letter(data['title'])
-            letters[letter].add_child(video_node(video, subtitle, data, licenses.CC_BY_NC_ND)) # was _SA
-        for audio, data in download_audios("modify.json"):
-            letter = first_letter(data['title'])
-            letters[letter].add_child(audio_node(audio, data, licenses.CC_BY_NC_ND)) # was _SA
-        for (video, subtitle), data in download_videos("modify.json"):
-            letter = first_letter(data['title'])
-            letters[letter].add_child(video_node(video, subtitle, data, licenses.CC_BY_NC_ND)) # was _SA
+            # this is the only bit that's audio specific, refactor out all the other junk
+            resource_node = audio_node(audio, data, licenses.CC_BY_NC_ND)
+            handle_resource_node(resource_node)
+            ## handle hierarchy
+            #categories = reverse_lookup[data['link']]
+            #for cat in categories:
+            #    cat_nodes[tuple(cat)].add_child(resource_node) # contains implicit assertion that contents exist
+            #
+            # # handle alphabet
+            # letter = first_letter(data['title'])
+            # letters[letter].add_child(resource_node) # was _SA
+            # handle skip: delete this!
+            i=i+1
+            if i>3: break
+        #for (video, subtitle), data in download_videos("share.json"):
+        #    letter = first_letter(data['title'])
+        #    letters[letter].add_child(video_node(video, subtitle, data, licenses.CC_BY_NC_ND)) # was _SA
+        #for audio, data in download_audios("modify.json"):
+        #    letter = first_letter(data['title'])
+        #    letters[letter].add_child(audio_node(audio, data, licenses.CC_BY_NC_ND)) # was _SA
+        #for (video, subtitle), data in download_videos("modify.json"):
+        #    letter = first_letter(data['title'])
+        #    letters[letter].add_child(video_node(video, subtitle, data, licenses.CC_BY_NC_ND)) # was _SA
         return channel
 
     

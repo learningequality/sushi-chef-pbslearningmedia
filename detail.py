@@ -23,7 +23,7 @@ except FileExistsError:
 sample_url="https://ca.pbslearningmedia.org/resource/vtl07.la.rv.text.cats/cats/"
 
 def filename_from_url(url):
-    return urlparse(url).path.strip("/").replace("/", "__")   
+    return urlparse(url).path.strip("/").replace("/", "__")[-120:]  # e
 
 
 def reencode(source_filename, file_format):    # TODO: refactor these non-mp4 hacks.
