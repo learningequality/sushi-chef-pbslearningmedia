@@ -1,6 +1,7 @@
 
 demo = "https://ca.pbslearningmedia.org/collection/video-production-behind-the-scenes-with-the-pros/#.WmdDyd-YHCI"
 demo2 = "https://ca.pbslearningmedia.org/collection/interview-techniques"
+demo_nested = "https://ca.pbslearningmedia.org/collection/montana-shakespeare/"
 
 """
 //div[@id='coll-default-text']//p  - top level text (same xpath for root and sub items but different text)
@@ -19,7 +20,13 @@ import json
 import re
 import requests_cache
 import string
+import hashlib
+from ricecooker.classes.nodes import TopicNode
+
 requests_cache.install_cache()
+
+def sha1(source):
+    return hashlib.sha1(source).hexdigest()
 
 def make_links_absolute(soup, url):
     # https://stackoverflow.com/questions/4468410/python-beautifulsoup-equivalent-to-lxml-make-links-absolute
@@ -58,6 +65,12 @@ class Category(object):
             return "<{}: {} ({})>".format(self.title, self.categories, len(self.resources))
         else:
             return "<{}: ({})>".format(self.title, len(self.resources))
+        
+    def depth(self):
+        while True:
+            if not(self.categories):
+                return 1
+            return max(x.depth() for x in self.categories)+1
 
 def crawl_collection(url):
     collection = crawl_category(url)
@@ -70,7 +83,7 @@ def crawl_collection(url):
 def crawl_category(url):
     # TODO pagination: https://ca.pbslearningmedia.org/collection/idptv/ -> /idptv/2
     # next page is contained in //li[@class='coll-next']/a/@href
-    print ('Category', url)
+    #print ('Category', url)
     assert type(url) == str, type(url)
     category = Category()
     category.url = url
@@ -91,11 +104,17 @@ def crawl_category(url):
         category.description = ""
     try:
         raw_index = soup.find("ul", {'class': 'js-open'}).find_all("li", {"class": 'topics-item'})
+        # also check for subtopic or top-item in same to get top 
     except AttributeError:
         raw_index = []
+    # also check for subtopic or top-item in same li's class to get supercategories
+    
     list_index = [i.find("a") for i in raw_index]
+    #top_level_index = ["*" if "top-item" in i.attrs['class'] else " " for i in raw_index] 
+    top_level_index = ["" for i in raw_index]  # USE LINE ABOVE IF YOU WANT TO THINK ABOUT NESTING
+    
     try:
-        index = [(i.text.strip(), i.attrs['href']) for i in list_index]
+        index = [(j + i.text.strip(), i.attrs['href']) for i,j in zip(list_index, top_level_index)]
     except AttributeError:
         index = []
     category.category_links = index  # only really relevant for collections!
@@ -114,7 +133,7 @@ def crawl_category(url):
         except Exception:
             continue # rare issue found on https://ca.pbslearningmedia.org/collection/new-to-learningmedia/
         if link not in crawl_dict:
-            print ("{} not crawled".format(link))
+            #print ("{} not crawled".format(link))
             continue # skip
         item_data = dict(crawl_dict[link])
         item_data['title'] = crawl_dict[link]['title']
@@ -127,7 +146,48 @@ def crawl_category(url):
     return category
 
 
+def all_collections():
+    
+    reverse = {}
+    hierarchy = {}
+    
+    with open("collection.json") as f:
+        for line in f.readlines():
+            url = json.loads(line)['link']
+            top_collection = crawl_collection(url)
+            print (top_collection)
+            print (top_collection.url)
+            categories = top_collection.categories
+            hierarchy_list = []
+            for cat in categories:
+                hierarchy_list.append([cat.title, sha1(cat.url)])
+                for resource in cat.resources:
+                    if resource not in reverse:
+                        reverse[resource] = []
+                    reverse[resource].append([top_collection.title, cat.title])
+            hierarchy[sha1(top_collection.url)] = [top_collection.title, hierarchy_list]
+            
+    
+    with open("collection_hierarchy.json", "w") as f:
+        json.dumps(hierarchy, f)
+    with open("collection_reverse.json", "w") as f:
+        json.dumps(reverse, f)
+                
+    
+            #{"top_id": ["topname", [["catname", "cat_id"], ["catname", "cat_id"]], "top_id": ... hierarchy.json
+            #+
+            #{"url": [["The Arts", "Visual Art"], ["Cats", "Dogs"]], "url": ... reverse.json
+                        
+            
+            
+            
+            
 
 
-print (crawl_collection(demo))
-#crawl_category(demo2)
+
+all_collections()
+#collection = crawl_collection(demo)
+#print (collection.depth())
+#print()
+#q=crawl_category(demo_nested)
+exit()
