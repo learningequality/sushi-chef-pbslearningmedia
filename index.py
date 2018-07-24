@@ -158,11 +158,11 @@ def build_reverse_index():
 
 
 if __name__ == "__main__":
-    build_subject_index()
-    build_reverse_index()
+    #build_subject_index()
+    #build_reverse_index()
 
-    exit()
-    #save_index({"selected_facets":"permitted_use_exact:Stream, Download, Share, and Modify"}, "modify.json")
+    #exit()
+    save_index({"selected_facets":"permitted_use_exact:Stream, Download, Share, and Modify"}, "modify.json")
     #save_index({"q": "kitten"}, "kitten.json")
     save_index({"selected_facets":"media_type_exact:Collection"}, "collection.json")
     save_index({"selected_facets":"permitted_use_exact:Stream, Download and Share"}, "share.json")
