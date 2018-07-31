@@ -26,7 +26,7 @@ from ricecooker.classes.nodes import TopicNode
 requests_cache.install_cache()
 
 def sha1(source):
-    return hashlib.sha1(source).hexdigest()
+    return hashlib.sha1(source.encode('utf-8')).hexdigest()
 
 def make_links_absolute(soup, url):
     # https://stackoverflow.com/questions/4468410/python-beautifulsoup-equivalent-to-lxml-make-links-absolute
@@ -59,7 +59,17 @@ class Category(object):
         self.resources = []
         self.category_links = []
         self.categories = []
+        
+    def populated(self):
+        if bool(self.resources):
+            return True
+        if any(x.populated() for x in self.categories):
+            return True
+        return False
     
+    def empty(self):
+        return not self.populated()
+        
     def __repr__(self):
         if self.categories:
             return "<{}: {} ({})>".format(self.title, self.categories, len(self.resources))
@@ -92,8 +102,8 @@ def crawl_category(url):
         response.raise_for_status()
     except Exception:
         return category
-    with open("out.html", "wb") as f:
-        f.write(response.content)
+    #with open("out.html", "wb") as f:
+    #    f.write(response.content)
     soup = BeautifulSoup(response.content, "html5lib")
     make_links_absolute(soup, url)
     category.title = soup.find("h2", {'class': 'coll-title'}).text.strip()
@@ -155,23 +165,26 @@ def all_collections():
         for line in f.readlines():
             url = json.loads(line)['link']
             top_collection = crawl_collection(url)
+            if top_collection.empty():
+                print ("EMPTY: ", top_collection)
+                continue
             print (top_collection)
-            print (top_collection.url)
             categories = top_collection.categories
             hierarchy_list = []
             for cat in categories:
                 hierarchy_list.append([cat.title, sha1(cat.url)])
                 for resource in cat.resources:
-                    if resource not in reverse:
-                        reverse[resource] = []
-                    reverse[resource].append([top_collection.title, cat.title])
+                    link = resource['link']
+                    if link not in reverse:
+                        reverse[link] = []
+                    reverse[link].append([top_collection.title, cat.title])
             hierarchy[sha1(top_collection.url)] = [top_collection.title, hierarchy_list]
             
     
     with open("collection_hierarchy.json", "w") as f:
-        json.dumps(hierarchy, f)
+        json.dump(hierarchy, f)
     with open("collection_reverse.json", "w") as f:
-        json.dumps(reverse, f)
+        json.dump(reverse, f)
                 
     
             #{"top_id": ["topname", [["catname", "cat_id"], ["catname", "cat_id"]], "top_id": ... hierarchy.json

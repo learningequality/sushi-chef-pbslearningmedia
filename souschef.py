@@ -4,15 +4,27 @@ import sys
 sys.path.append(os.getcwd()) # Handle relative imports
 import requests
 from le_utils.constants import licenses
-from ricecooker.classes.nodes import DocumentNode, VideoNode, AudioNode, TopicNode
+from ricecooker.classes.nodes import DocumentNode, VideoNode, AudioNode, TopicNode, Node
 from ricecooker.classes.files import HTMLZipFile, VideoFile, SubtitleFile, DownloadFile
 from ricecooker.chefs import SushiChef
 import logging
 import detail
 import json 
 
-
 LOGGER = logging.getLogger()
+
+## this is just a bit of debug code: TODO delete this
+## NOPE: now actively ignoring duplicates!
+def add_child_placeholder(self, node):
+    if node in self.children:
+        raise RuntimeError("double node")
+        return
+    assert isinstance(node, Node)
+    node.parent = self
+    self.children += [node]
+
+Node.add_child = add_child_placeholder
+######
 
 
 class PBSChef(SushiChef):
@@ -46,6 +58,11 @@ class PBSChef(SushiChef):
             categories = reverse_lookup.get(data['link'], [])
             for cat in categories:
                 cat_nodes[tuple(cat)].add_child(resource_node) # contains implicit assertion that contents exist
+
+            # handle collections
+            collections = coll_reverse_lookup.get(data['link'], [])
+            for coll in collections:
+                coll_nodes[tuple(coll)].add_child(resource_node) 
         
             # handle alphabet
             letter = first_letter(data['title'])
@@ -109,28 +126,33 @@ class PBSChef(SushiChef):
                                    title = "Categorical Index",
                                    description="")
         cat_nodes = {}
+        coll_nodes = {}
         channel.add_child(category_index)
         with open("reverse.json") as f:
             reverse_lookup = json.load(f)
         with open("hierarchy.json") as f:
             hierarchy = json.load(f)
-        for top_level in hierarchy:
-            top_name, sub_level = hierarchy[top_level]
-            top_node = TopicNode(source_id="cat_{}".format(top_level),
-                                 title=top_name)
-            category_index.add_child(top_node)
-            for sub_item in sub_level:
-                sub_name, sub_id = sub_item
-                sub_node = TopicNode(source_id="cat_{}".format(sub_id),
-                                     title=sub_name)
-                top_node.add_child(sub_node)
-                cat_nodes[(top_name, sub_name)] = sub_node
+
+        with open("collection_reverse.json") as f:
+            coll_reverse_lookup = json.load(f)
+        with open("collection_hierarchy.json") as f:
+            coll_hierarchy = json.load(f)
+
+        def create_hierarchy(hierarchy, name, node_structure):
+            for top_level in hierarchy:
+                top_name, sub_level = hierarchy[top_level]
+                top_node = TopicNode(source_id="{}_{}".format(name, top_level),
+                                     title=top_name)
+                category_index.add_child(top_node)
+                for sub_item in sub_level:
+                    sub_name, sub_id = sub_item
+                    sub_node = TopicNode(source_id="{}_{}".format(name, sub_id),
+                                         title=sub_name)
+                    top_node.add_child(sub_node)
+                    node_structure[(top_name, sub_name)] = sub_node
                 
-                
-                
-                
-                
-            
+        create_hierarchy(hierarchy, "cat", cat_nodes)
+        create_hierarchy(coll_hierarchy, "coll", coll_nodes)
             
         # create a topic and add it to channel
         data = {}
@@ -142,17 +164,22 @@ class PBSChef(SushiChef):
             # this is the only bit that's audio specific, refactor out all the other junk
             resource_node = audio_node(audio, data, licenses.CC_BY_NC_ND)
             handle_resource_node(resource_node)
-            ## handle hierarchy
-            #categories = reverse_lookup[data['link']]
-            #for cat in categories:
-            #    cat_nodes[tuple(cat)].add_child(resource_node) # contains implicit assertion that contents exist
-            #
-            # # handle alphabet
-            # letter = first_letter(data['title'])
-            # letters[letter].add_child(resource_node) # was _SA
-            # handle skip: delete this!
-            i=i+1
-            if i>3: break
+            #### handle hierarchy
+            ###categories = reverse_lookup.get(data['link'], [])
+            ###print (categories)
+            ###for cat in categories:
+            ###    cat_nodes[tuple(cat)].add_child(resource_node) # contains implicit assertion that contents exist
+            ###
+            #### handle collections
+            ###collections = coll_reverse_lookup.get(data['link'], [])
+            ###for coll in collections:
+            ###   coll_nodes[tuple(coll)].add_child(resource_node) # contains implicit assertion that contents exist
+            #### handle alphabet
+            ###letter = first_letter(data['title'])
+            ###letters[letter].add_child(resource_node) # was _SA
+            #handle skip: delete this!
+            #i=i+1
+            #if i>3: break
         #for (video, subtitle), data in download_videos("share.json"):
         #    letter = first_letter(data['title'])
         #    letters[letter].add_child(video_node(video, subtitle, data, licenses.CC_BY_NC_ND)) # was _SA
