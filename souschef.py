@@ -161,34 +161,17 @@ class PBSChef(SushiChef):
 #            channel.add_child(document_node(doc, data, licenses.CC_BY_NC_ND)) # was _SA
         i = 0
         for audio, data in download_audios("share.json"):
-            # this is the only bit that's audio specific, refactor out all the other junk
             resource_node = audio_node(audio, data, licenses.CC_BY_NC_ND)
             handle_resource_node(resource_node)
-            #### handle hierarchy
-            ###categories = reverse_lookup.get(data['link'], [])
-            ###print (categories)
-            ###for cat in categories:
-            ###    cat_nodes[tuple(cat)].add_child(resource_node) # contains implicit assertion that contents exist
-            ###
-            #### handle collections
-            ###collections = coll_reverse_lookup.get(data['link'], [])
-            ###for coll in collections:
-            ###   coll_nodes[tuple(coll)].add_child(resource_node) # contains implicit assertion that contents exist
-            #### handle alphabet
-            ###letter = first_letter(data['title'])
-            ###letters[letter].add_child(resource_node) # was _SA
-            #handle skip: delete this!
-            #i=i+1
-            #if i>3: break
-        #for (video, subtitle), data in download_videos("share.json"):
-        #    letter = first_letter(data['title'])
-        #    letters[letter].add_child(video_node(video, subtitle, data, licenses.CC_BY_NC_ND)) # was _SA
-        #for audio, data in download_audios("modify.json"):
-        #    letter = first_letter(data['title'])
-        #    letters[letter].add_child(audio_node(audio, data, licenses.CC_BY_NC_ND)) # was _SA
-        #for (video, subtitle), data in download_videos("modify.json"):
-        #    letter = first_letter(data['title'])
-        #    letters[letter].add_child(video_node(video, subtitle, data, licenses.CC_BY_NC_ND)) # was _SA
+        for (video, subtitle), data in download_videos("share.json"):
+            resource_node = video_node(video, subtitle, data, licenses.CC_BY_NC_ND) # was _SA
+            handle_resource_node(resource_node)
+        for audio, data in download_audios("modify.json"):
+            resource_node = audio_node(audio, data, licenses.CC_BY_NC_ND)
+            handle_resource_node(resource_node)
+        for (video, subtitle), data in download_videos("modify.json"):
+            resource_node = video_node(video, subtitle, data, licenses.CC_BY_NC_ND) # was _SA
+            handle_resource_node(resource_node)
         return channel
 
     
