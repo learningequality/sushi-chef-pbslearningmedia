@@ -12,12 +12,15 @@ import detail
 import json 
 
 LOGGER = logging.getLogger()
+MAX_NODE_LENGTH = 500
 
 ## this is just a bit of debug code: TODO delete this
 ## NOPE: now actively ignoring duplicates!
 def add_child_placeholder(self, node):
     if node in self.children:
-        raise RuntimeError("double node")
+        # raise RuntimeError("double node")
+        return
+    if node.source_id in [x.source_id for x in self.children]:
         return
     assert isinstance(node, Node)
     node.parent = self
@@ -26,6 +29,11 @@ def add_child_placeholder(self, node):
 Node.add_child = add_child_placeholder
 ######
 
+current_id = 1000000
+def get_next_id():
+    global current_id
+    current_id = current_id + 1
+    return str(current_id)
 
 class PBSChef(SushiChef):
     # hierarchy = # open reverse.json and parse
@@ -57,12 +65,28 @@ class PBSChef(SushiChef):
             # handle hierarchy
             categories = reverse_lookup.get(data['link'], [])
             for cat in categories:
-                cat_nodes[tuple(cat)].add_child(resource_node) # contains implicit assertion that contents exist
+                cat_node = cat_nodes[tuple(cat)]
+                if len(cat_node.children) > MAX_NODE_LENGTH:
+                    # create new node
+                    new_node = TopicNode(source_id=get_next_id(),
+                                         title="More")
+                    cat_node.add_child(new_node)
+                    cat_nodes[tuple(cat)] = new_node
+                    cat_node = new_node
+                cat_node.add_child(resource_node) # contains implicit assertion that contents exist
 
             # handle collections
             collections = coll_reverse_lookup.get(data['link'], [])
             for coll in collections:
-                coll_nodes[tuple(coll)].add_child(resource_node) 
+                node = coll_nodes[tuple(coll)]
+                if len(node.children) > MAX_NODE_LENGTH:
+                    # create new node
+                    new_node = TopicNode(source_id=get_next_id(),
+                                         title="More")
+                    node.add_child(new_node)
+                    coll_nodes[tuple(coll)] = new_node
+                    node = new_node
+                node.add_child(resource_node) 
         
             # handle alphabet
             letter = first_letter(data['title'])
@@ -125,9 +149,13 @@ class PBSChef(SushiChef):
         category_index = TopicNode(source_id="category",
                                    title = "Categorical Index",
                                    description="")
+
+        collection_index = TopicNode(source_id="collections",
+                                     title = "Collections")
         cat_nodes = {}
         coll_nodes = {}
         channel.add_child(category_index)
+        channel.add_child(collection_index)
         with open("reverse.json") as f:
             reverse_lookup = json.load(f)
         with open("hierarchy.json") as f:
@@ -143,7 +171,10 @@ class PBSChef(SushiChef):
                 top_name, sub_level = hierarchy[top_level]
                 top_node = TopicNode(source_id="{}_{}".format(name, top_level),
                                      title=top_name)
-                category_index.add_child(top_node)
+                if name == "cat":
+                    category_index.add_child(top_node)
+                elif name == "coll":
+                    collection_index.add_child(top_node)
                 for sub_item in sub_level:
                     sub_name, sub_id = sub_item
                     sub_node = TopicNode(source_id="{}_{}".format(name, sub_id),
