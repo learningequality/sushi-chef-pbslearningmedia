@@ -29,6 +29,8 @@ print ("Imported ", len(raw_index_data), " index entries")
 print ("Using", len(index_data), " shareable index entries")
 
 # Create list of leaf-tags.
+# leaf_tags = {"audio": ['a', 'b'...], ...}
+s_tags = list(tags.tags.keys())
 s_tags.append("NOPE:NOPE")
 leaf_tags = {}
 old_tag = ""
@@ -42,8 +44,6 @@ for tag in s_tags:
         leaf_tags[pre].append(post)
     old_tag = tag
 assert ("NOPE") not in leaf_tags
-print (leaf_tags)
-exit()
 
 
 def first_letter(title):
