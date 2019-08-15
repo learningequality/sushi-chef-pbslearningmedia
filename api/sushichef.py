@@ -10,7 +10,8 @@ from ricecooker.chefs import SushiChef
 import logging
 import jsonlines
 import tags
-
+import add_file
+from detail import get_individual_page
 LOGGER = logging.getLogger()
 MAX_NODE_LENGTH = 500
 
@@ -46,6 +47,7 @@ for tag in s_tags:
 assert ("NOPE") not in leaf_tags
 
 
+### old
 def first_letter(title):
     if title.upper().startswith("THE "):
         return first_letter(title[4:])
@@ -59,12 +61,13 @@ def first_letter(title):
             return "#"
     return "#" # no alphanumeric at all?
         
+### old
 def audio_node(audio, data, license_type):
     print (data['title'])
     return AudioNode(source_id=data['link'],
                      title=data['title'],
                      description=data['full_description'], # TODO: see below
-                     license = license_type,
+                     license=licenses.SPECIAL_PERMISSIONS,
                      copyright_holder="PBS Learning Media",
                      files = [audio,])
 
@@ -82,6 +85,7 @@ def audio_node(audio, data, license_type):
 #                        files = [document,])
 
 
+# old
 def video_node(video, subtitle, data, license_type):
     if subtitle:
         files = [video, subtitle]
@@ -118,10 +122,34 @@ class PBS_API_Chef(SushiChef):
     
         # create channel
         channel = self.get_channel(**kwargs)
-        _index = TopicNode(source_id="collections",
-                                     title = "Collections")
-        channel.add_child(collection_index)
-            
+        nodes = {}
+        for medium in leaf_tags: # 'audio'
+            if medium != "Video": continue
+            nodes[medium] = TopicNode(source_id = medium, title = medium)
+            channel.add_child(nodes[medium])
+            for index in index_data:
+                resource_url = index['detail']['objects'][0]['canonical_url']
+                for x in index['detail']['objects']:
+                    print (x['canonical_url'], x['role'])
+                  
+                canonical = index['index']['canonical_url']
+                print(get_individual_page(item={"link":canonical,
+                                                "title": index['index']['title'],}) )
+                
+                break
+
+
+                nodes[canonical] = add_file.create_node(url=resource_url,
+                                                       title=index['index']['title'],
+                                                       license=licenses.SPECIAL_PERMISSIONS,
+                                                       copyright_holder="PBS Learning Media",
+                                                       description=index['detail']['description'])
+                channel.add_child(nodes[canonical]) # WRONG, implement tree
+                    
+                #nodes[index['index']['canonical_url']] = video_node(
+                print (index)
+                break
+
         return channel
  
 def make_channel():
