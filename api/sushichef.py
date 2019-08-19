@@ -7,13 +7,18 @@ from le_utils.constants import licenses
 from ricecooker.classes.nodes import DocumentNode, VideoNode, AudioNode, TopicNode, Node
 from ricecooker.classes.files import HTMLZipFile, VideoFile, SubtitleFile, DownloadFile
 from ricecooker.chefs import SushiChef
+from ricecooker.classes.licenses import SpecialPermissionsLicense
 import logging
 import jsonlines
 import tags
 import add_file
-from detail import get_individual_page
+import download
 LOGGER = logging.getLogger()
 MAX_NODE_LENGTH = 500
+
+SHARE_LICENCE = SpecialPermissionsLicense(copyright_holder="PBS", description='Verbatim Use ("Stream, Download, and Share") — You are permitted to download the Content, make verbatim copies of the Content, incorporate the Content unmodified into a presentation, and distribute verbatim copies of the Content, but you may not edit or alter the Content or create any derivative works of the Content. You must attribute the Content as indicated in the Download Package.')
+
+MODIFY_LICENCE = SpecialPermissionsLicense(copyright_holder='PBS', description='Download to Re-edit and Distribute ("Stream, Download, Share, and Modify") — You are permitted to download, edit, distribute, and make derivative works of the Content. You must attribute the Content as indicated in the Download Package. Read the full license.')
 
 def use_rights(x):
     try:
@@ -46,61 +51,30 @@ for tag in s_tags:
     old_tag = tag
 assert ("NOPE") not in leaf_tags
 
-
-### old
-def first_letter(title):
-    if title.upper().startswith("THE "):
-        return first_letter(title[4:])
-    if title.upper().startswith("A "):
-        return first_letter(title[2:])
-    
-    for char in title.upper():
-        if char in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-            return char
-        if char in "01234567890":
-            return "#"
-    return "#" # no alphanumeric at all?
+nodes = {}
+def hier(medium, curriculum_tags):
+    out_tags = []
+    all_ancestors = []
+    for tag in curriculum_tags:
+        all_ancestors.extend(tag['ancestor_ids'])
+    for tag in sorted(curriculum_tags, key =lambda x: x['id']):
+        slug = tag['slug']
+        _id = tag['id']
+        name = tag['name']
+        if not tag['ancestor_ids']:
+            ancestor = "ROOT"
+        else:
+            ancestor = tag['ancestor_ids'][-1]
+        # attach to tree
+        if _id not in nodes[medium]:
+            nodes[medium][_id] = TopicNode(source_id=slug, title =name)
+            nodes[medium][ancestor].add_child(nodes[medium][_id])
         
-### old
-def audio_node(audio, data, license_type):
-    print (data['title'])
-    return AudioNode(source_id=data['link'],
-                     title=data['title'],
-                     description=data['full_description'], # TODO: see below
-                     license=licenses.SPECIAL_PERMISSIONS,
-                     copyright_holder="PBS Learning Media",
-                     files = [audio,])
-
-#def document_node(document, data, license_type):
-#    print (data['title'])
-#    if document.get_filename().lower().endswith(".pdf"):
-#        node = DocumentNode
-#    else:
-#        node = DownloadNode
-#        return node(source_id=data['link'],
-#                        title=data['title'],
-#                        description=data['full_description'], # TODO: see below
-#                        license = license_type,
-#                        copyright_holder="PBS Learning Media",
-#                        files = [document,])
-
-
-# old
-def video_node(video, subtitle, data, license_type):
-    if subtitle:
-        files = [video, subtitle]
-    else:
-        files = [video,]
-    print (data['title'])
-    return VideoNode(source_id=data['link'],
-                     title=data['title'],
-                     description=data['full_description'],  # TODO: get full descriptiom
-                     license=license_type, 
-                     copyright_holder="PBS Learning Media",
-                     files=files,
-                     )            
-        
-
+        if _id not in all_ancestors:
+            out_tags.append(nodes[medium][_id])
+    assert out_tags
+    return out_tags
+  
 
 class PBS_API_Chef(SushiChef):
     # hierarchy = # open reverse.json and parse
@@ -122,40 +96,40 @@ class PBS_API_Chef(SushiChef):
     
         # create channel
         channel = self.get_channel(**kwargs)
-        nodes = {}
-        for medium in leaf_tags: # 'audio'
+        i=0
+        for medium in leaf_tags: # 'Audio'
             if medium != "Video": continue
-            nodes[medium] = TopicNode(source_id = medium, title = medium)
-            channel.add_child(nodes[medium])
+            nodes[medium]={}
+            nodes[medium]["ROOT"] = TopicNode(source_id = medium, title = medium)
+            channel.add_child(nodes[medium]["ROOT"])
             for index in index_data:
+                leafs = hier(medium, index['detail']['curriculum_tags'])
                 resource_url = index['detail']['objects'][0]['canonical_url']
                 for x in index['detail']['objects']:
                     print (x['canonical_url'], x['role'])
                   
                 canonical = index['index']['canonical_url']
-                print(get_individual_page(item={"link":canonical,
-                                                "title": index['index']['title'],}) )
-                
-                break
+                assert canonical is not None
 
 
-                nodes[canonical] = add_file.create_node(url=resource_url,
+                nodes[canonical], _ = download.download_video_from_html(canonical_url=resource_url,
                                                        title=index['index']['title'],
-                                                       license=licenses.SPECIAL_PERMISSIONS,
+                                                       license=SHARE_LICENCE,
                                                        copyright_holder="PBS Learning Media",
                                                        description=index['detail']['description'])
-                channel.add_child(nodes[canonical]) # WRONG, implement tree
-                    
-                #nodes[index['index']['canonical_url']] = video_node(
-                print (index)
-                break
+                for leaf in leafs:
+                    print (leaf)
+                    leaf.add_child(nodes[canonical])             
+                i=i+1
+                if i==100: break
 
         return channel
  
 def make_channel():
     mychef = PBS_API_Chef()
-    args = {'token': os.environ['KOLIBRI_STUDIO_TOKEN'], 'reset': True, 'verbose': True}
-    options = {}
-    mychef.run(args, options)
+    #args = {'token': os.environ['KOLIBRI_STUDIO_TOKEN'], 'reset': True, 'verbose': True}
+    #options = {}
+    #mychef.run(args, options)
+    mychef.main()
 
 make_channel()
