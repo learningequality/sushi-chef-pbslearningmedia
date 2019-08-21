@@ -8,6 +8,9 @@ UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubu
 class NotAZipFile(Exception):
     pass
 
+class NotAVideo(Exception):
+    pass
+
 try:
     os.mkdir("zipcache")
 except FileExistsError:
@@ -19,7 +22,10 @@ def download_video_from_html(canonical_url, **kwargs):
     root = lxml.html.fromstring(response.content)
     # get relevant script signature
     scripts= root.xpath("//script/text()")
-    script, = [x for x in scripts if 'jwSettings1' in x]
+    try:
+        script, = [x for x in scripts if 'jwSettings1' in x]
+    except Exception:
+        raise NotAVideo("jwSettings1")
     # start at first `{`, end at first `\n};` for data structure};
     left = script.index("{")
     right = script.index("\n};")
@@ -32,12 +38,17 @@ def download_video_from_html(canonical_url, **kwargs):
     video_node = add_file.create_node(filename=video_filename, **kwargs)
 
     if primary_media['caption']:
-        caption_filename, caption_mime = add_file.download_file(primary_media['caption'])
-        caption_file = add_file.create_file(filename=caption_filename, **kwargs)
-        video_node.add_file(caption_file)
+        try:
+            caption_filename, caption_mime = add_file.download_file(primary_media['caption'])
+        except add_file.UnidentifiedFileType:
+            pass 
+        else:
+            caption_file = add_file.create_file(filename=caption_filename, **kwargs)
+            video_node.add_file(caption_file)
 
     transcript_node = None
-    if primary_media['transcript']:
-        transcript_filename, transcript_mime = add_file.download_file(primary_media['transcript'])
-        transcript_node = add_file.create_node(filename=transcript_filename, **kwargs)
+    # note: add .docx to guess_mime if you reenable this
+    #if primary_media['transcript']:
+    #    transcript_filename, transcript_mime = add_file.download_file(primary_media['transcript'])
+    #    transcript_node = add_file.create_node(filename=transcript_filename, **kwargs)
     return video_node, transcript_node

@@ -57,6 +57,7 @@ def hier(medium, curriculum_tags):
     all_ancestors = []
     for tag in curriculum_tags:
         all_ancestors.extend(tag['ancestor_ids'])
+    retry = {}
     for tag in sorted(curriculum_tags, key =lambda x: x['id']):
         slug = tag['slug']
         _id = tag['id']
@@ -68,10 +69,14 @@ def hier(medium, curriculum_tags):
         # attach to tree
         if _id not in nodes[medium]:
             nodes[medium][_id] = TopicNode(source_id=slug, title =name)
-            nodes[medium][ancestor].add_child(nodes[medium][_id])
-        
+            try:
+                nodes[medium][ancestor].add_child(nodes[medium][_id])
+            except Exception:
+                retry[(medium,ancestor)] = nodes[medium][_id]      
         if _id not in all_ancestors:
             out_tags.append(nodes[medium][_id])
+    for k,v in retry.items():
+        nodes[k[0]][k[1]].add_child(v)
     assert out_tags
     return out_tags
   
@@ -102,26 +107,35 @@ class PBS_API_Chef(SushiChef):
             nodes[medium]={}
             nodes[medium]["ROOT"] = TopicNode(source_id = medium, title = medium)
             channel.add_child(nodes[medium]["ROOT"])
-            for index in index_data:
+            for i, index in enumerate(index_data):
+
+                if i<470: continue
+               
                 leafs = hier(medium, index['detail']['curriculum_tags'])
                 resource_url = index['detail']['objects'][0]['canonical_url']
-                for x in index['detail']['objects']:
-                    print (x['canonical_url'], x['role'])
+                print ("#", i, ":", resource_url)
+                #for x in index['detail']['objects']:
+                #    print (x['canonical_url'], x['role'])
                   
                 canonical = index['index']['canonical_url']
                 assert canonical is not None
 
 
-                nodes[canonical], _ = download.download_video_from_html(canonical_url=resource_url,
-                                                       title=index['index']['title'],
-                                                       license=SHARE_LICENCE,
-                                                       copyright_holder="PBS Learning Media",
-                                                       description=index['detail']['description'])
+                try:
+                    nodes[canonical], _ = download.download_video_from_html(canonical_url=resource_url,
+                                                           title=index['index']['title'],
+                                                           license=SHARE_LICENCE,
+                                                           copyright_holder="PBS Learning Media",
+                                                           description=index['detail']['description']                
+                                         )
+                except download.NotAVideo:
+                    with open("fail.log", "a") as f:
+                        f.write(str(i)+":"+canonical + " isn't a video\n")
+                    continue
+
                 for leaf in leafs:
-                    print (leaf)
+                    # print (leaf)
                     leaf.add_child(nodes[canonical])             
-                i=i+1
-                if i==100: break
 
         return channel
  

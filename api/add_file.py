@@ -69,8 +69,8 @@ def download_file(url):
     setup_directory()
     filename = DOWNLOAD_FOLDER + "/" + create_filename(url)
     if not os.path.exists(filename):
-        #print ("Downloading to {}".format(filename))
-        #print ("{} bytes".format(response.headers.get("content-length")))
+        print ("Downloading to {}".format(filename))
+        print ("{} bytes".format(response.headers.get("content-length")))
         try:
             with open(filename, "wb") as f:
                 # https://www.reddit.com/r/learnpython/comments/27ba7t/requests_library_doesnt_download_directly_to_disk/
@@ -186,6 +186,8 @@ def guess_type(mime_type="",
                        "video/webm": TranscodeVideo,
                        "application/pdf": DocumentFile,
                        "video/quicktime": TranscodeVideo,
+                       "video/x-flv": TranscodeVideo,
+
                        }
 
     if mime_type in content_mapping:
@@ -226,7 +228,7 @@ def guess_type(mime_type="",
 
     # TODO -- consider using python_magic library
 
-    raise UnidentifiedFileType(str([mime_type, extension, magic]))
+    raise UnidentifiedFileType(str([mime_type, extension, magic, file_mime]))
 
 
 
