@@ -9,8 +9,15 @@ import hashlib
 import os
 from transcode import transcode_video, transcode_audio
 import subprocess
+import glob
 
-class UnidentifiedFileType(Exception):
+class CantMakeNode(Exception):
+    pass
+
+class UnidentifiedFileType(CantMakeNode):
+    pass
+
+class DidntTranscode(CantMakeNode):
     pass
 
 class TranscodeVideo(object):
@@ -68,7 +75,8 @@ def download_file(url):
     response = requests.get(url, stream=True)
     setup_directory()
     filename = DOWNLOAD_FOLDER + "/" + create_filename(url)
-    if not os.path.exists(filename):
+    file_exists = [x for x in glob.glob(filename+"*") if "_transcode" not in x]
+    if not file_exists:
         print ("Downloading to {}".format(filename))
         print ("{} bytes".format(response.headers.get("content-length")))
         try:
@@ -86,7 +94,8 @@ def download_file(url):
             raise
 
     else:
-        print ("Already exists in cache")
+        filename, = file_exists
+        print ("Already exists in cache as {}".format(filename))
     # get the bit before the ; in the content-type, if there is one
     content_type = response.headers.get('Content-Type', "").split(";")[0].strip()
     return filename, content_type
@@ -130,11 +139,17 @@ def create_node(file_class=None, url=None, filename=None, title=None, license=No
     # Transcode video if necessary
     if file_class == TranscodeVideo:
         file_class = VideoFile
-        filename = transcode_video(filename)
+        try:
+            filename = transcode_video(filename)
+        except:
+            raise DidntTranscode
 
     if file_class == TranscodeAudio:
         file_class = AudioFile
-        filename = transcode_audio(filename)
+        try:
+            filename = transcode_audio(filename)
+        except:
+            raise DidntTranscode
 
     # TODO - consider non-MP3 audio files
 
@@ -187,6 +202,8 @@ def guess_type(mime_type="",
                        "application/pdf": DocumentFile,
                        "video/quicktime": TranscodeVideo,
                        "video/x-flv": TranscodeVideo,
+                       "video/3gpp": TranscodeVideo,
+                       # 'application/xml': DFXP format SubtitleFile -- too vague
 
                        }
 
@@ -197,8 +214,10 @@ def guess_type(mime_type="",
                          ".mp4": VideoFile,
                          ".webm": TranscodeVideo,
                          ".m4v": TranscodeVideo,
+                         ".m4a": TranscodeVideo,
                          ".pdf": DocumentFile,
                          ".vtt": SubtitleFile,
+                         ".dfxp": SubtitleFile,
                          # "zip": HTMLZipFile,  # primarily for carousels
                          }
 

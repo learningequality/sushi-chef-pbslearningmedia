@@ -40,7 +40,7 @@ def download_video_from_html(canonical_url, **kwargs):
     if primary_media['caption']:
         try:
             caption_filename, caption_mime = add_file.download_file(primary_media['caption'])
-        except add_file.UnidentifiedFileType:
+        except add_file.CantMakeNode:
             pass 
         else:
             caption_file = add_file.create_file(filename=caption_filename, **kwargs)

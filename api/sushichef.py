@@ -13,12 +13,17 @@ import jsonlines
 import tags
 import add_file
 import download
+
+sys.setrecursionlimit(10000)
 LOGGER = logging.getLogger()
 MAX_NODE_LENGTH = 500
 
 SHARE_LICENCE = SpecialPermissionsLicense(copyright_holder="PBS", description='Verbatim Use ("Stream, Download, and Share") — You are permitted to download the Content, make verbatim copies of the Content, incorporate the Content unmodified into a presentation, and distribute verbatim copies of the Content, but you may not edit or alter the Content or create any derivative works of the Content. You must attribute the Content as indicated in the Download Package.')
 
 MODIFY_LICENCE = SpecialPermissionsLicense(copyright_holder='PBS', description='Download to Re-edit and Distribute ("Stream, Download, Share, and Modify") — You are permitted to download, edit, distribute, and make derivative works of the Content. You must attribute the Content as indicated in the Download Package. Read the full license.')
+
+licence_lookup = {"Stream, Download and Share": SHARE_LICENCE,
+                  "Stream, Download, Share, and Modify": MODIFY_LICENCE}
 
 def use_rights(x):
     try:
@@ -109,7 +114,7 @@ class PBS_API_Chef(SushiChef):
             channel.add_child(nodes[medium]["ROOT"])
             for i, index in enumerate(index_data):
 
-                if i<470: continue
+                if i<6710: continue
                
                 leafs = hier(medium, index['detail']['curriculum_tags'])
                 resource_url = index['detail']['objects'][0]['canonical_url']
@@ -124,7 +129,7 @@ class PBS_API_Chef(SushiChef):
                 try:
                     nodes[canonical], _ = download.download_video_from_html(canonical_url=resource_url,
                                                            title=index['index']['title'],
-                                                           license=SHARE_LICENCE,
+                                                           license=licence_lookup[index['detail']['use_rights']],
                                                            copyright_holder="PBS Learning Media",
                                                            description=index['detail']['description']                
                                          )
@@ -132,6 +137,11 @@ class PBS_API_Chef(SushiChef):
                     with open("fail.log", "a") as f:
                         f.write(str(i)+":"+canonical + " isn't a video\n")
                     continue
+                except add_file.CantMakeNode:
+                    with open("fail.log", "a") as f:
+                        f.write(str(i)+":"+canonical + " is a bad video\n")
+                    continue
+               
 
                 for leaf in leafs:
                     # print (leaf)
@@ -141,6 +151,8 @@ class PBS_API_Chef(SushiChef):
  
 def make_channel():
     mychef = PBS_API_Chef()
+    os.environ['KOLIBRI_STUDIO_TOKEN'] = "c738e0971587868d7be296dc16736abc68482f1a"
+    os.environ['STUDIO_URL']  = "https://develop.studio.learningequality.org"
     #args = {'token': os.environ['KOLIBRI_STUDIO_TOKEN'], 'reset': True, 'verbose': True}
     #options = {}
     #mychef.run(args, options)
