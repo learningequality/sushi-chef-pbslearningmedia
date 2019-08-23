@@ -151,8 +151,6 @@ class PBS_API_Chef(SushiChef):
  
 def make_channel():
     mychef = PBS_API_Chef()
-    os.environ['KOLIBRI_STUDIO_TOKEN'] = "c738e0971587868d7be296dc16736abc68482f1a"
-    os.environ['STUDIO_URL']  = "https://develop.studio.learningequality.org"
     #args = {'token': os.environ['KOLIBRI_STUDIO_TOKEN'], 'reset': True, 'verbose': True}
     #options = {}
     #mychef.run(args, options)
