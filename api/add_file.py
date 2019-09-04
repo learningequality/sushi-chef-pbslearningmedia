@@ -7,7 +7,6 @@ from le_utils.constants import licenses
 from urllib.parse import urlsplit
 import hashlib
 import os
-from transcode import transcode_video, transcode_audio
 import subprocess
 import glob
 
@@ -16,15 +15,6 @@ class CantMakeNode(Exception):
 
 class UnidentifiedFileType(CantMakeNode):
     pass
-
-class DidntTranscode(CantMakeNode):
-    pass
-
-class TranscodeVideo(object):
-    "Placeholder filetype for videos that require transcoding"
-
-class TranscodeAudio(object):
-    "Placeholder filetype for audio that requires transcoding"
 
 SUBTITLE_LANGUAGE = "en"
 
@@ -136,24 +126,7 @@ def create_node(file_class=None, url=None, filename=None, title=None, license=No
     assert file_class
     print (file_class)
 
-    # Transcode video if necessary
-    if file_class == TranscodeVideo:
-        file_class = VideoFile
-        try:
-            filename = transcode_video(filename)
-        except:
-            raise DidntTranscode
-
-    if file_class == TranscodeAudio:
-        file_class = AudioFile
-        try:
-            filename = transcode_audio(filename)
-        except:
-            raise DidntTranscode
-
-    # TODO - consider non-MP3 audio files
-
-    # Ensure file has correct extension for the type of file we think it is:
+        # Ensure file has correct extension for the type of file we think it is:
     # this is a requirement from sushichef.
     extensions = {VideoFile: ".mp4",
                   AudioFile: ".mp3",
@@ -198,11 +171,11 @@ def guess_type(mime_type="",
     content_mapping = {"audio/mp3": AudioFile,
                        "video/mp4": VideoFile,
                        "audio/mp4": VideoFile,
-                       "video/webm": TranscodeVideo,
+                       "video/webm": VideoFile,
                        "application/pdf": DocumentFile,
-                       "video/quicktime": TranscodeVideo,
-                       "video/x-flv": TranscodeVideo,
-                       "video/3gpp": TranscodeVideo,
+                       "video/quicktime": VideoFile,
+                       "video/x-flv": VideoFile,
+                       "video/3gpp": VideoFile,
                        # 'application/xml': DFXP format SubtitleFile -- too vague
 
                        }
@@ -212,9 +185,9 @@ def guess_type(mime_type="",
 
     extension_mapping = {".mp3": AudioFile,
                          ".mp4": VideoFile,
-                         ".webm": TranscodeVideo,
-                         ".m4v": TranscodeVideo,
-                         ".m4a": TranscodeVideo,
+                         ".webm": VideoFile,
+                         ".m4v": VideoFile,
+                         ".m4a": AudioFile,
                          ".pdf": DocumentFile,
                          ".vtt": SubtitleFile,
                          ".dfxp": SubtitleFile,
@@ -227,7 +200,7 @@ def guess_type(mime_type="",
     magic_mapping = {b"\xFF\xFB": AudioFile,
                      b"ID3": AudioFile,
                      b"%PDF": DocumentFile,
-                     b"\x1A\x45\xDF\xA3": TranscodeVideo,
+                     b"\x1A\x45\xDF\xA3": VideoFile,
                      b"WEBVTT": SubtitleFile,
                      # b"PK": HTMLZipFile,
                      }
