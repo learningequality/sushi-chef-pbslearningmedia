@@ -10,3 +10,5 @@ api/full.jsonlines
 api/cache.sqlite
 restore
 storage
+*.json
+*.jsonlines

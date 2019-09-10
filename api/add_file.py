@@ -16,21 +16,12 @@ class CantMakeNode(Exception):
 class UnidentifiedFileType(CantMakeNode):
     pass
 
+
+TEMP_FILE = "__temp"
 SUBTITLE_LANGUAGE = "en"
 
-DOWNLOAD_FOLDER = "__downloads"  # this generates completed files
 metadata = {}
 have_setup = False
-
-def setup_directory():
-    global have_setup
-    if have_setup: return
-    have_setup = True
-    try:
-        os.mkdir(DOWNLOAD_FOLDER)
-    except FileExistsError:
-        pass
-
 
 node_dict = {VideoFile: VideoNode,
              AudioFile: AudioNode,
@@ -55,7 +46,7 @@ def guess_extension(url):
 def create_filename(url):
     return hashlib.sha1(url.encode('utf-8')).hexdigest() + guess_extension(url)
 
-def download_file(url):
+def examine_file(url):
     """
     Download file to the DOWNLOAD_FOLDER with a content-generated filename.
     Return that filename and the mime type the server told us the file was
@@ -63,37 +54,26 @@ def download_file(url):
 
     # url must be fully specified!
     response = requests.get(url, stream=True)
-    setup_directory()
-    filename = DOWNLOAD_FOLDER + "/" + create_filename(url)
-    file_exists = [x for x in glob.glob(filename+"*") if "_transcode" not in x]
-    if not file_exists:
-        print ("Downloading to {}".format(filename))
-        print ("{} bytes".format(response.headers.get("content-length")))
-        try:
-            with open(filename, "wb") as f:
-                # https://www.reddit.com/r/learnpython/comments/27ba7t/requests_library_doesnt_download_directly_to_disk/
-                for chunk in response.iter_content( chunk_size = 1024 ):
-                    if chunk: # filter out keep-alive new chunks
-                        f.write(chunk)
-        except:  # Explicitly, we also want to catch CTRL-C here.
-            print("Catching & deleting bad zip created by quitting")
-            try:
-                os.remove(filename)
-            except FileNotFoundError:
-                pass
-            raise
-
-    else:
-        filename, = file_exists
-        print ("Already exists in cache as {}".format(filename))
-    # get the bit before the ; in the content-type, if there is one
+    try:
+        os.remove(TEMP_FILE)
+    except Exception:
+        pass
+    try:
+        with open(TEMP_FILE, "wb") as f:
+            # https://www.reddit.com/r/learnpython/comments/27ba7t/requests_library_doesnt_download_directly_to_disk/
+            for chunk in response.iter_content( chunk_size = 1024 ): # might want 32K
+                if chunk: # filter out keep-alive new chunks
+                    f.write(chunk)
+                    break
+    except Exception as e:
+        print (e)
     content_type = response.headers.get('Content-Type', "").split(";")[0].strip()
-    return filename, content_type
+    return content_type
 
-def create_file(*args, **kwargs):
+def create_file(*args, **kwargs):  # as a ricecooker file object, suitable for inserting into a node, for e.g. subtitles
     return create_node(*args, as_file=True, **kwargs)
 
-def create_node(file_class=None, url=None, filename=None, title=None, license=None, copyright_holder=None, description="", as_file=False):
+def create_node(file_class=None, url=None, title=None, license=None, copyright_holder=None, description="", as_file=False, author=None):
     """
     Create a content node from either a URL or filename.
     Which content node is determined by:
@@ -105,63 +85,49 @@ def create_node(file_class=None, url=None, filename=None, title=None, license=No
     if they're not provided correctly, things will break downstream
     """
 
-    mime = None
-    if filename is None:
-        assert url, "Neither URL nor filename provided to create_node"
-        filename, mime = download_file(url)
+    assert url, "URL not provided to create_node"
+    mime = examine_file(url)  # TEMP_FILE now contains data
 
     if file_class is None:
-        with open(filename, "rb") as f:
+        with open(TEMP_FILE, "rb") as f:
             magic_bytes = f.read(10)[:10]  # increase if we use python_magic
         try:
             file_class = guess_type(mime_type=mime,
-                                    extension=guess_extension(url or filename),
+                                    extension=guess_extension(url),
                                     magic=magic_bytes,
-                                    filename=filename)
+                                    filename=TEMP_FILE)
         except Exception:
-            print(url, filename)
+            print(url)
             raise
         # there is a reasonable chance that the file isn't actually a suitable filetype
         # and that guess_type will raise an UnidentifiedFileType error.
     assert file_class
     print (file_class)
-
-        # Ensure file has correct extension for the type of file we think it is:
-    # this is a requirement from sushichef.
-    extensions = {VideoFile: ".mp4",
-                  AudioFile: ".mp3",
-                  DocumentFile: ".pdf",
-                  HTMLZipFile: ".zip",
-                  SubtitleFile: ".vtt"}
-    extension = extensions[file_class]
-    if not filename.endswith(extension):
-        new_filename = filename + extension
-        os.rename(filename, new_filename)
-        filename = new_filename
-
-    # print (filename, os.path.getsize(filename))
-
-    # Do not permit zero-byte files
-    assert(os.path.getsize(filename))
-
+   
     keywords = {VideoFile: {"ffmpeg_settings": {"max_width": 480, "crf": 28}},
                 AudioFile: {},
                 DocumentFile: {},
                 HTMLZipFile: {},
                 SubtitleFile: {"language": SUBTITLE_LANGUAGE}}
-    file_instance = file_class(filename, **keywords[file_class])
+    file_instance = file_class(url, **keywords[file_class])
     if as_file:
         return file_instance
 
     node_class = node_dict[file_class]
 
-    return node_class(source_id=filename,  # unique due to content-hash
+    node = node_class(source_id=url,  # unique due to content-hash
                       title=title,
                       license=license or metadata['license'],
                       copyright_holder=copyright_holder or metadata['copyright_holder'],
                       files=[file_instance],
                       description=description,
+                      author=author,
                       )
+    try:
+        node.validate()
+    except Exception as e:
+        raise CantMakeNode(str(e))
+    return node
 
 def guess_type(mime_type="",
                extension="",
@@ -187,7 +153,7 @@ def guess_type(mime_type="",
                          ".mp4": VideoFile,
                          ".webm": VideoFile,
                          ".m4v": VideoFile,
-                         ".m4a": AudioFile,
+                         #".m4a": AudioFile,
                          ".pdf": DocumentFile,
                          ".vtt": SubtitleFile,
                          ".dfxp": SubtitleFile,

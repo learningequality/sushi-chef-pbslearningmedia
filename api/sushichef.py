@@ -13,6 +13,18 @@ import jsonlines
 import tags
 import add_file
 import download
+from copy import deepcopy
+import ricecooker
+from bs4 import BeautifulSoup
+from le_utils.constants.format_presets import PRESETLIST
+
+for preset in PRESETLIST:
+    if preset.id in ("high_res_video", "low_res_video"):
+        preset.convertible_formats.append("m4v")
+        preset.convertible_formats.append("mov")
+    if preset.id in ("audio",):
+        preset.convertible_formats.append("m4a")
+
 
 sys.setrecursionlimit(10000)
 LOGGER = logging.getLogger()
@@ -25,12 +37,34 @@ MODIFY_LICENCE = SpecialPermissionsLicense(copyright_holder='PBS', description='
 licence_lookup = {"Stream, Download and Share": SHARE_LICENCE,
                   "Stream, Download, Share, and Modify": MODIFY_LICENCE}
 
-def use_rights(x):
-    try:
-        return "Share" in str(x['detail']['use_rights'])
-    except Exception:
-        return False
+def add_child_replacement(self, node, before=False):
+    """ add_child: Adds child node to node
+        Args: node to add as child
+        Returns: None
+    """
+    
+    assert isinstance(node, Node), "Child node must be a subclass of Node"
+    node.parent = self
+    for child in self.children:
+        if node.source_id == child.source_id:
+            print( "source_id {} repeated in {}".format(node.source_id, repr(self)))
+            return
+    if not before:
+        self.children += [node]
+    else:
+        self.children.insert(0,node)
 
+ricecooker.classes.nodes.add_child = add_child_replacement
+
+def as_text(html):
+    soup = BeautifulSoup(html, features="lxml")
+    return soup.get_text()
+
+def use_rights(x):
+    if 'detail' not in x.keys(): return False
+    if 'use_rights' not in x['detail'].keys(): return False
+    return "Share" in str(x['detail']['use_rights'])
+    
 ### Import index and filter for only shareable entries
 with jsonlines.open("full.uniq.jsonlines") as reader:
     raw_index_data = list(reader)
@@ -75,13 +109,15 @@ def hier(medium, curriculum_tags):
         if _id not in nodes[medium]:
             nodes[medium][_id] = TopicNode(source_id=slug, title =name)
             try:
-                nodes[medium][ancestor].add_child(nodes[medium][_id])
+                add_child_replacement(nodes[medium][ancestor], nodes[medium][_id], before=True)
+                # nodes[medium][ancestor].add_child(nodes[medium][_id])
             except Exception:
                 retry[(medium,ancestor)] = nodes[medium][_id]      
         if _id not in all_ancestors:
             out_tags.append(nodes[medium][_id])
     for k,v in retry.items():
-        nodes[k[0]][k[1]].add_child(v)
+        add_child_replacement(nodes[k[0]][k[1]], v, before=True)
+        # nodes[k[0]][k[1]].add_child(v)
     assert out_tags
     return out_tags
   
@@ -106,6 +142,7 @@ class PBS_API_Chef(SushiChef):
     
         # create channel
         channel = self.get_channel(**kwargs)
+
         i=0
         for medium in leaf_tags: # 'Audio'
             if medium != "Video": continue
@@ -114,7 +151,7 @@ class PBS_API_Chef(SushiChef):
             channel.add_child(nodes[medium]["ROOT"])
             for i, index in enumerate(index_data):
 
-                if i<6710: continue
+                #if i<7710: continue
                
                 leafs = hier(medium, index['detail']['curriculum_tags'])
                 resource_url = index['detail']['objects'][0]['canonical_url']
@@ -125,13 +162,20 @@ class PBS_API_Chef(SushiChef):
                 canonical = index['index']['canonical_url']
                 assert canonical is not None
 
+                attrib_array = []
+                for a in index['detail']['required_attributions']:
+                    attrib_array.append(a['name'])
+                attrib = ", ".join(set(attrib_array))
+
+
 
                 try:
                     nodes[canonical], _ = download.download_video_from_html(canonical_url=resource_url,
                                                            title=index['index']['title'],
                                                            license=licence_lookup[index['detail']['use_rights']],
                                                            copyright_holder="PBS Learning Media",
-                                                           description=index['detail']['description']                
+                                                           author = attrib,
+                                                           description=as_text(index['detail']['description'])
                                          )
                 except download.NotAVideo:
                     with open("fail.log", "a") as f:
@@ -145,15 +189,16 @@ class PBS_API_Chef(SushiChef):
 
                 for leaf in leafs:
                     # print (leaf)
-                    leaf.add_child(nodes[canonical])             
+                    add_child_replacement(leaf, deepcopy(nodes[canonical]), before=False)
+                    # leaf.add_child(deepcopy(nodes[canonical]))
 
         return channel
  
 def make_channel():
     mychef = PBS_API_Chef()
-    #args = {'token': os.environ['KOLIBRI_STUDIO_TOKEN'], 'reset': True, 'verbose': True}
-    #options = {}
-    #mychef.run(args, options)
-    mychef.main()
+    args = {'token': os.environ['KOLIBRI_STUDIO_TOKEN'], 'reset': True, 'verbose': True}
+    options = {}
+    mychef.run(args, options)
+    #mychef.main()
 
 make_channel()
