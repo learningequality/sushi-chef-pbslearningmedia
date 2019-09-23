@@ -92,6 +92,7 @@ assert ("NOPE") not in leaf_tags
 
 nodes = {}
 def hier(medium, curriculum_tags):
+    
     out_tags = []
     all_ancestors = []
     for tag in curriculum_tags:
@@ -144,16 +145,13 @@ class PBS_API_Chef(SushiChef):
         channel = self.get_channel(**kwargs)
 
         i=0
-        for medium in leaf_tags: # 'Audio'
-            if medium != "Video": continue
-            nodes[medium]={}
-            nodes[medium]["ROOT"] = TopicNode(source_id = medium, title = medium)
-            channel.add_child(nodes[medium]["ROOT"])
+        for fake_medium in leaf_tags: # 'Audio'
+            #if medium != "Video": continue
             for i, index in enumerate(index_data):
 
-                #if i<7710: continue
+                # completes OK
+                #if i>5: continue
                
-                leafs = hier(medium, index['detail']['curriculum_tags'])
                 resource_url = index['detail']['objects'][0]['canonical_url']
                 print ("#", i, ":", resource_url)
                 #for x in index['detail']['objects']:
@@ -170,22 +168,30 @@ class PBS_API_Chef(SushiChef):
 
 
                 try:
-                    nodes[canonical], _ = download.download_video_from_html(canonical_url=resource_url,
+                    nodes[canonical], actual_medium = download.download_something(canonical_url=resource_url,
                                                            title=index['index']['title'],
                                                            license=licence_lookup[index['detail']['use_rights']],
                                                            copyright_holder="PBS Learning Media",
                                                            author = attrib,
                                                            description=as_text(index['detail']['description'])
                                          )
-                except download.NotAVideo:
+                except download.NotExpected:
                     with open("fail.log", "a") as f:
-                        f.write(str(i)+":"+canonical + " isn't a video\n")
+                        f.write(str(i)+":"+canonical + " isn't anything\n")
                     continue
                 except add_file.CantMakeNode:
                     with open("fail.log", "a") as f:
-                        f.write(str(i)+":"+canonical + " is a bad video\n")
+                        f.write(str(i)+":"+canonical + " is a bad thing\n")
                     continue
-               
+                except download.Skip:
+                    continue
+            
+                if actual_medium not in nodes:
+                    nodes[actual_medium]={}
+                    nodes[actual_medium]["ROOT"] = TopicNode(source_id = actual_medium, title = actual_medium)
+                    channel.add_child(nodes[actual_medium]["ROOT"])
+                
+                leafs = hier(actual_medium, index['detail']['curriculum_tags'])
 
                 for leaf in leafs:
                     # print (leaf)
