@@ -63,7 +63,10 @@ def download_something(canonical_url, **kwargs):
         jsontext = script[left:right+2]
         j = json.loads(jsontext)
         primary_media, = [x for x in j['lo']['media'] if x['primary']]
-        return (primary_media, "Videos")
+        if ".mp3" in primary_media:
+            return (primary_media, "Audio")
+        else:
+            return (primary_media, "Videos")
 
     def get_image_url():
         imgs = root.xpath("//img[@id='asset-image']")
@@ -106,7 +109,7 @@ def download_something(canonical_url, **kwargs):
 
     target_url = primary_media['url']
     
-    node = add_file.create_node(url=target_url, **kwargs)
+    node = add_file.create_node(url=target_url, source_id=canonical_url, **kwargs)
 
     if 'caption' in primary_media and primary_media['caption']:
         try:
@@ -117,4 +120,7 @@ def download_something(canonical_url, **kwargs):
             caption_file = add_file.create_file(url=caption_url, **kwargs)
             node.add_file(caption_file)
 
-    return node, media 
+    return node, media
+
+if __name__ == "__main__":
+    print(download_something("https://ca.pbslearningmedia.org/asset/cd5c6a16-e3be-4d67-94e3-e5817b0fc1be/"))

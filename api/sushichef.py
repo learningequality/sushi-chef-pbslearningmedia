@@ -17,6 +17,8 @@ from copy import deepcopy
 import ricecooker
 from bs4 import BeautifulSoup
 from le_utils.constants.format_presets import PRESETLIST
+import standards
+import copyright
 
 for preset in PRESETLIST:
     if preset.id in ("high_res_video", "low_res_video"):
@@ -131,7 +133,8 @@ class PBS_API_Chef(SushiChef):
         'CHANNEL_SOURCE_ID': 'pbslearningmedia_api',         # channel's unique id
         'CHANNEL_TITLE': 'PBS Learning Media',
         'CHANNEL_LANGUAGE': 'en',                          # Use language codes from le_utils
-        # 'CHANNEL_THUMBNAIL': 'https://im.openupresources.org/assets/im-logo.svg', # (optional) local path or url to image file
+        # TODO add thumbnail
+        'CHANNEL_THUMBNAIL': "pbs.png",
         'CHANNEL_DESCRIPTION': 'Bring Your Classroom to Life With PBS',  # (optional) description of the channel (optional)
     }
 
@@ -145,13 +148,13 @@ class PBS_API_Chef(SushiChef):
         channel = self.get_channel(**kwargs)
 
         i=0
-        for fake_medium in leaf_tags: # 'Audio'
+        for _ in leaf_tags: # original media descriptons like 'Audio' which are wrong.
             #if medium != "Video": continue
             for i, index in enumerate(index_data):
 
                 # completes OK
-                #if i>5: continue
-               
+                if i>5: continue
+
                 resource_url = index['detail']['objects'][0]['canonical_url']
                 print ("#", i, ":", resource_url)
                 #for x in index['detail']['objects']:
@@ -160,21 +163,46 @@ class PBS_API_Chef(SushiChef):
                 canonical = index['index']['canonical_url']
                 assert canonical is not None
 
-                attrib_array = []
+                
+                copyright_string = index['detail']['copyright']
+                if not copyright.has_copyright(copyright_string):
+                    copyright_list = []
+                    for a in index['detail']['required_attributions']:
+                        if a['role'].lower() == "producer":
+                            copyright_list.append(a['name'])
+                        if copyright_list:
+                            copyright_string = ", ".join(set(copyright_list))
+                        else:
+                            copyright_string = "PBS Learning Media"
+
+                # TODO - fix
+                author_array = []
                 for a in index['detail']['required_attributions']:
-                    attrib_array.append(a['name'])
-                attrib = ", ".join(set(attrib_array))
+                    if a['role'] in ['brand', 'contributor']:
+                        author_array.append(a['name'])
+                author_string = ", ".join(set(author_array))
 
-
+                provider_array = []
+                for a in index['detail']['required_attributions']:
+                    if a['role'] in ['funder', 'sponsor', 'partner']:
+                        provider_array.append(a['name'])
+                provider_string = ", ".join(set(provider_array))
+                
+                standards_tags = standards.get_standards(index['detail']['canonical_url'])
 
                 try:
                     nodes[canonical], actual_medium = download.download_something(canonical_url=resource_url,
                                                            title=index['index']['title'],
                                                            license=licence_lookup[index['detail']['use_rights']],
-                                                           copyright_holder="PBS Learning Media",
-                                                           author = attrib,
-                                                           description=as_text(index['detail']['description'])
-                                         )
+                                                           copyright_holder=copyright_string,
+                                                           author = author_string,
+                                                           # Done later because of ricecooker bug
+                                                           # see https://github.com/learningequality/ricecooker/issues/226
+                                                           # provider = provider_string,
+                                                           # tags=standards_tags,
+                                                           description=as_text(index['detail']['description']),
+                                                           )
+
                 except download.NotExpected:
                     with open("fail.log", "a") as f:
                         f.write(str(i)+":"+canonical + " isn't anything\n")
@@ -185,6 +213,10 @@ class PBS_API_Chef(SushiChef):
                     continue
                 except download.Skip:
                     continue
+                nodes[canonical].provider = provider_string
+                nodes[canonical].tags=standards_tags
+                                                      
+                                                           
             
                 if actual_medium not in nodes:
                     nodes[actual_medium]={}

@@ -16,7 +16,7 @@ class CantMakeNode(Exception):
 class UnidentifiedFileType(CantMakeNode):
     pass
 
-
+VALIDATE = True
 TEMP_FILE = "__temp"
 SUBTITLE_LANGUAGE = "en"
 
@@ -73,7 +73,8 @@ def examine_file(url):
 def create_file(*args, **kwargs):  # as a ricecooker file object, suitable for inserting into a node, for e.g. subtitles
     return create_node(*args, as_file=True, **kwargs)
 
-def create_node(file_class=None, url=None, title=None, license=None, copyright_holder=None, description="", as_file=False, author=None):
+def create_node(file_class=None, url=None, title=None, license=None, copyright_holder=None,
+                description="", as_file=False, author=None, source_id=None):
     """
     Create a content node from either a URL or filename.
     Which content node is determined by:
@@ -86,6 +87,8 @@ def create_node(file_class=None, url=None, title=None, license=None, copyright_h
     """
 
     assert url, "URL not provided to create_node"
+    if not source_id:
+        source_id=url
     mime = examine_file(url)  # TEMP_FILE now contains data
 
     if file_class is None:
@@ -104,7 +107,8 @@ def create_node(file_class=None, url=None, title=None, license=None, copyright_h
     assert file_class
     print (file_class)
    
-    keywords = {VideoFile: {"ffmpeg_settings": {"max_width": 480, "crf": 28}},
+    keywords = {VideoFile: {"ffmpeg_settings": {"max_width": 480, "crf": 28},
+                            },
                 AudioFile: {},
                 DocumentFile: {},
                 HTMLZipFile: {},
@@ -114,17 +118,19 @@ def create_node(file_class=None, url=None, title=None, license=None, copyright_h
         return file_instance
 
     node_class = node_dict[file_class]
-
-    node = node_class(source_id=url,  # unique due to content-hash
+    
+    node = node_class(source_id=source_id,
                       title=title,
-                      license=license or metadata['license'],
-                      copyright_holder=copyright_holder or metadata['copyright_holder'],
+                      license=license or metadata.get('license'),
+                      copyright_holder=copyright_holder or metadata.get('copyright_holder'),
                       files=[file_instance],
                       description=description,
                       author=author,
+                      derive_thumbnail=True,
                       )
     try:
-        node.validate()
+        if VALIDATE:
+            node.validate()
     except Exception as e:
         raise CantMakeNode(str(e))
     return node
