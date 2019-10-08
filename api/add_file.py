@@ -107,8 +107,7 @@ def create_node(file_class=None, url=None, title=None, license=None, copyright_h
     assert file_class
     print (file_class)
    
-    keywords = {VideoFile: {"ffmpeg_settings": {"max_width": 480, "crf": 28},
-                            },
+    keywords = {VideoFile: {"ffmpeg_settings": {"max_width": 480, "crf": 28}},
                 AudioFile: {},
                 DocumentFile: {},
                 HTMLZipFile: {},
@@ -119,7 +118,8 @@ def create_node(file_class=None, url=None, title=None, license=None, copyright_h
 
     node_class = node_dict[file_class]
     
-    node = node_class(source_id=source_id,
+    if node_class == VideoNode:
+        node = node_class(source_id=source_id,
                       title=title,
                       license=license or metadata.get('license'),
                       copyright_holder=copyright_holder or metadata.get('copyright_holder'),
@@ -127,6 +127,15 @@ def create_node(file_class=None, url=None, title=None, license=None, copyright_h
                       description=description,
                       author=author,
                       derive_thumbnail=True,
+                      )
+    else:
+        node = node_class(source_id=source_id,
+                      title=title,
+                      license=license or metadata.get('license'),
+                      copyright_holder=copyright_holder or metadata.get('copyright_holder'),
+                      files=[file_instance],
+                      description=description,
+                      author=author,
                       )
     try:
         if VALIDATE:

@@ -18,6 +18,7 @@ import ricecooker
 from bs4 import BeautifulSoup
 from le_utils.constants.format_presets import PRESETLIST
 import standards
+import support
 import copyright
 
 for preset in PRESETLIST:
@@ -153,7 +154,7 @@ class PBS_API_Chef(SushiChef):
             for i, index in enumerate(index_data):
 
                 # completes OK
-                if i>5: continue
+                if i>2: continue
 
                 resource_url = index['detail']['objects'][0]['canonical_url']
                 print ("#", i, ":", resource_url)
@@ -215,9 +216,18 @@ class PBS_API_Chef(SushiChef):
                     continue
                 nodes[canonical].provider = provider_string
                 nodes[canonical].tags=standards_tags
-                                                      
-                                                           
-            
+
+                support_nodes = support.get_support_nodes(detail = index['detail'],
+                                                          license = licence_lookup[index['detail']['use_rights']],
+                                                          copyright_holder = copyright_string,
+                                                          author = author_string)
+                video_topic_node = TopicNode(source_id="vtn_"+resource_url, title=index['index']['title'])
+                add_child_replacement(video_topic_node, nodes[canonical])
+                for node in support_nodes:
+                    add_child_replacement(video_topic_node, node)
+
+                # TODO - do something with support nodes!
+                
                 if actual_medium not in nodes:
                     nodes[actual_medium]={}
                     nodes[actual_medium]["ROOT"] = TopicNode(source_id = actual_medium, title = actual_medium)
@@ -227,7 +237,8 @@ class PBS_API_Chef(SushiChef):
 
                 for leaf in leafs:
                     # print (leaf)
-                    add_child_replacement(leaf, deepcopy(nodes[canonical]), before=False)
+                    # WAS: add_child_replacement(leaf, deepcopy(nodes[canonical]), before=False)
+                    add_child_replacement(leaf, deepcopy(video_topic_node), before=False) # TODO: deepercopy
                     # leaf.add_child(deepcopy(nodes[canonical]))
 
         return channel
