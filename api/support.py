@@ -11,11 +11,17 @@ class HTMLFoundry(foundry.Foundry):
         self.raw_content = self.params['html'].encode('utf-8')
 
 def get_support_nodes(url=None, detail=None, **kwargs):
+    if url and "data:" in url:
+        return []
     if url:
         detail = requests.get(url).json()
+    else:
+        url = detail['canonical_url']
+
     print ("*")
-    for support in detail.get('support_materials', []):
-        if support['media_type'] == "HTMLFragment": 
+    for i, support in enumerate(detail.get('support_materials', [])):
+        if support['media_type'] == "HTMLFragment":
+
 
             f = HTMLFoundry(url=url+"#"+str(i),
                             params={"html": support['media'][0]['content']},
@@ -27,12 +33,16 @@ def get_support_nodes(url=None, detail=None, **kwargs):
             #node.license = template_node.license
             #node.copyright_holder = template_node.copyright_holder
             #node.author = template_node.author
+            yield node
         else:
-            node, _ = download.download_something(
+            try:
+                node, _ = download.download_something(
                                  canonical_url=support['canonical_url'],
-                                 title=support['title'],
+                                 title=support['title'],          
                                  **kwargs)
-        yield node
+            except download.Skip:
+                continue
+            yield node
         # if media_type is 'HTMLFragment', take media[0]['content'] as a HTML5App
         #support_node, support_medium = download.download_something(
         #    canonical_url=resource_url,
@@ -46,3 +56,4 @@ def get_support_nodes(url=None, detail=None, **kwargs):
 if __name__ == "__main__":
     for i, url in enumerate(urls):
         print (list(get_support_nodes(url)))
+
