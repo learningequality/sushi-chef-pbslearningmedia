@@ -33,7 +33,9 @@ def download_something(canonical_url, **kwargs):
                 return x()
             except NotExpected:
                 pass
-        raise RuntimeError("No detection for ", canonical_url)
+        print ("No detection for", canonical_url)
+        return ({"url": None}, "Unknown Error")
+        # raise RuntimeError("No detection for ", canonical_url)
 
     def get_server_error():
         if b"Internal Server Error" in response.content:
@@ -105,7 +107,7 @@ def download_something(canonical_url, **kwargs):
 
     root = lxml.html.fromstring(response.content)
     primary_media, media = get_url()
-    if media in ["Images", "Flash", "Slideshow", "Redirect", "Login", "Server Error"]:
+    if media in ["Images", "Flash", "Slideshow", "Redirect", "Login", "Server Error", "Unknown Error"]:
         raise Skip(media)
     assert primary_media['url']
 

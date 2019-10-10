@@ -154,7 +154,7 @@ class PBS_API_Chef(SushiChef):
             for i, index in enumerate(index_data):
 
                 # completes OK
-                #if i>102: continue
+                #if i<320: continue
 
                 resource_url = index['detail']['objects'][0]['canonical_url']
                 print ("#", i, ":", resource_url)
