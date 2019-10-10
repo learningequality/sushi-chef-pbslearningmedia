@@ -38,6 +38,8 @@ def download_something(canonical_url, **kwargs):
     def get_server_error():
         if b"Internal Server Error" in response.content:
             return ({"url": None}, "Server Error")
+        if response.status_code > 399:
+            return ({"url": None}, "Server Error")
         raise NotExpected()
 
     def get_redirect_url():
